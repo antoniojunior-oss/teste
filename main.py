@@ -55,7 +55,9 @@ with col1:
     st.subheader("Visualização do Site")
     if url:
         # Tenta mostrar o site original num iframe
-        st.components.v1.iframe(url, height=600, scrolling=True)
+        # Tenta carregar através de um proxy gratuito (apenas para teste)
+proxy_url = f"https://api.allorigins.win/raw?url={url}"
+st.components.v1.iframe(proxy_url, height=600, scrolling=True)
     else:
         st.info("Aguardando URL para visualização.")
 
