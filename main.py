@@ -17,7 +17,7 @@ if api_key:
 st.title("🚗 IA Dealer: Análise e Edição de Sites")
 st.write("Insira a URL da concessionária para capturar o código e sugerir alterações.")
 
-# Inicializa o estado da sessão para não perder dados ao recarregar
+# Inicializa o estado da sessão
 if "codigo_fonte" not in st.session_state:
     st.session_state.codigo_fonte = ""
 
@@ -28,16 +28,14 @@ if st.button("Analisar Site"):
     if url:
         try:
             with st.spinner("Capturando código do site..."):
-                # Simula um navegador para evitar bloqueios simples
-                headers = {'User-Agent': 'Mozilla/5.0'}
+                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
                 response = requests.get(url, headers=headers, timeout=10)
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
-                # Captura Scripts e um pouco do HTML
+                # Captura Scripts e HTML
                 scripts = soup.find_all('script')
                 texto_scripts = "\n".join([s.get_text() for s in scripts if s.get_text()])
                 
-                # Armazena os primeiros 5000 caracteres de cada para não estourar o limite da IA
                 st.session_state.codigo_fonte = f"HTML ESTRUTURAL:\n{soup.prettify()[:5000]}\n\nSCRIPTS ATUAIS:\n{texto_scripts[:5000]}"
                 st.success("Site analisado com sucesso!")
         except Exception as e:
@@ -45,7 +43,6 @@ if st.button("Analisar Site"):
     else:
         st.warning("Por favor, insira uma URL válida.")
 
-# Divisor visual (agora dentro da função do Streamlit, do jeito certo)
 st.divider()
 
 # Interface de Duas Colunas
@@ -54,10 +51,10 @@ col1, col2 = st.columns([1, 1])
 with col1:
     st.subheader("Visualização do Site")
     if url:
-        # Tenta mostrar o site original num iframe
-        # Tenta carregar através de um proxy gratuito (apenas para teste)
-proxy_url = f"https://api.allorigins.win/raw?url={url}"
-st.components.v1.iframe(proxy_url, height=600, scrolling=True)
+        # Usando o Proxy para tentar burlar o bloqueio de visualização
+        proxy_url = f"https://api.allorigins.win/raw?url={url}"
+        st.components.v1.iframe(proxy_url, height=600, scrolling=True)
+        st.caption("Nota: Se o site não aparecer, ele possui proteções avançadas contra frames.")
     else:
         st.info("Aguardando URL para visualização.")
 
@@ -71,13 +68,12 @@ with col2:
             prompt = f"""
             Você é um desenvolvedor especialista em sites de concessionárias. 
             Abaixo está parte do código-fonte do site analisado:
-            
             {st.session_state.codigo_fonte}
             
             O usuário deseja a seguinte alteração: {pergunta}
             
             Gere o código (JavaScript ou CSS) necessário para realizar essa mudança. 
-            Seja didático e explique onde colar esse código.
+            Seja didático e explique onde colar esse código no painel da concessionária.
             """
             
             with st.spinner("A IA está gerando a solução..."):
