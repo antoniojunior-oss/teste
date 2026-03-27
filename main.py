@@ -1,155 +1,118 @@
-texto = texto.replace('```', '').strip()
-    return texto
+import streamlit as st
+import requests
+from bs4 import BeautifulSoup
+import google.generativeai as genai
 
-@st.cache_resource
-def configurar_modelo_ia(key):
+# 1. Configuração da Página
+st.set_page_config(page_title="IA Dealer Pro - Sandbox", layout="wide")
+
+# 2. Funções de Suporte
+def carregar_modelo(key):
     try:
         genai.configure(api_key=key)
-        # Lista modelos para garantir compatibilidade
-        modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
-        # Ordem de preferência de modelos
-        preferencia = ['models/gemini-1.5-pro', 'models/gemini-1.5-flash', 'models/gemini-pro']
-        for p in preferencia:
-            if p in modelos:
-                return genai.GenerativeModel(p)
-        return genai.GenerativeModel(modelos[0]) if modelos else None
+        # Tenta pegar o Flash que é mais rápido para scripts simples
+        return genai.GenerativeModel('gemini-1.5-flash')
     except Exception as e:
-        st.sidebar.error(f"Erro na API Key: {e}")
         return None
 
-model = None
-if api_key:
-    model = configurar_modelo_ia(api_key)
-    if model:
-        st.sidebar.success("✅ IA Conectada!")
-    else:
-        st.sidebar.warning("⚠️ Falha ao carregar modelo.")
-
-# 3. ESTADO DA SESSÃO (MEMÓRIA)
+# 3. Estado da Sessão (Persistência de Dados)
 if "codigo_fonte" not in st.session_state:
     st.session_state.codigo_fonte = ""
 if "scripts_aplicados" not in st.session_state:
     st.session_state.scripts_aplicados = ""
 if "url_atual" not in st.session_state:
     st.session_state.url_atual = ""
-if "historico_scripts" not in st.session_state:
-    st.session_state.historico_scripts = []
 
-# 4. INTERFACE DE ENTRADA
+# 4. Barra Lateral
+st.sidebar.title("⚙️ Configurações")
+api_key = st.sidebar.text_input("Insira sua Gemini API Key", type="password")
+model = carregar_modelo(api_key) if api_key else None
+
+# 5. Interface Principal
 st.title("🚗 IA Dealer: Editor & Sandbox")
-st.write("Insira a URL, analise a estrutura e aplique scripts via IA para ver as mudanças no Sandbox.")
 
-url_input = st.text_input("URL do Site da Concessionária:", placeholder="https://www.peugeot.com.br")
+url = st.text_input("URL da Concessionária:", value=st.session_state.url_atual, placeholder="https://www.exemplo.com.br")
 
-if st.button("🔍 1. Analisar Estrutura"):
-    if url_input:
+if st.button("🔍 Analisar e Clonar Site"):
+    if url:
         try:
-            with st.spinner("A extrair código e scripts do site..."):
-                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'}
-                response = requests.get(url_input, headers=headers, timeout=15)
+            with st.spinner("Capturando estrutura..."):
+                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+                response = requests.get(url, headers=headers, timeout=15)
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
-                # Salva os dados na sessão
-                st.session_state.url_atual = url_input
+                st.session_state.url_atual = url
                 st.session_state.codigo_fonte = soup.prettify()
-                st.session_state.scripts_aplicados = "" # Limpa scripts anteriores ao trocar de site
-                st.session_state.historico_scripts = []
-                st.success("✅ Estrutura capturada! O Sandbox foi gerado.")
+                st.session_state.scripts_aplicados = "" # Limpa scripts antigos ao carregar novo site
+                st.success("Site capturado com sucesso!")
+                st.rerun()
         except Exception as e:
-            st.error(f"Erro ao aceder ao site: {e}")
-    else:
-        st.warning("Insira uma URL válida.")
+            st.error(f"Erro ao acessar: {e}")
 
 st.divider()
 
-# 5. LAYOUT DE COLUNAS
-col1, col2 = st.columns([1, 1])
-
-with col1:
-    st.subheader("🧪 Visualização Sandbox (Editável)")
-    if st.session_state.codigo_fonte:
-        # CONSTRUÇÃO DO HTML PARA O SANDBOX
-        # Usamos <base> para que os recursos originais (imagens/css) funcionem
-        html_sandbox = f"""
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <base href="{st.session_state.url_atual}">
-                <meta charset="UTF-8">
-                <style>
-                    /* Scripts CSS injetados pela IA */
-                    {st.session_state.scripts_aplicados}
-                </style>
-            </head>
-            <body>
-                {st.session_state.codigo_fonte}
-                <script>
-                    /* Scripts JS injetados pela IA */
-                    try {{
-                        {st.session_state.scripts_aplicados}
-                    }} catch(e) {{
-                        console.error("Erro no script da IA:", e);
-                    }}
-                </script>
-            </body>
-        </html>
-        """
-        # Renderiza o Sandbox
-        st.components.v1.html(html_sandbox, height=600, scrolling=True)
-        
-        if st.button("🗑️ Limpar Sandbox"):
-            st.session_state.scripts_aplicados = ""
-            st.session_state.historico_scripts = []
-            st.rerun()
-    else:
-        st.info("Aguardando análise do site para ativar o Sandbox.")
+# 6. Colunas: Visualização vs Controles
+col1, col2 = st.columns([1.2, 0.8])
 
 with col2:
-    st.subheader("🤖 Assistente de Script")
+    st.subheader("🤖 Assistente IA")
     if st.session_state.codigo_fonte:
-        instrucao = st.text_area("O que deseja mudar?", 
-                                 placeholder="Ex: Mude o fundo para preto e esconda o seletor de unidades.", 
-                                 height=150)
+        instrucao = st.text_area("O que deseja mudar no Sandbox?", 
+                                 placeholder="Ex: Altere a cor dos botões para vermelho e mude o texto do banner principal.")
         
-        if st.button("✨ 2. Gerar e Aplicar Alteração"):
+        btn_gerar = st.button("✨ Gerar e Aplicar Alterações")
+        
+        if btn_gerar:
             if model:
-                with st.spinner("A IA está a processar a alteração..."):
+                with st.spinner("IA criando o script..."):
+                    # Prompt mais robusto para garantir retorno limpo
+                    prompt = f"""
+                    Você é um especialista em web design. Analise o HTML abaixo e crie um código (CSS ou JS) para atender ao pedido.
+                    HTML (trecho): {st.session_state.codigo_fonte[:5000]}
+                    
+                    PEDIDO: {instrucao}
+                    
+                    REGRAS:
+                    1. Se for alteração visual, gere CSS dentro de <style>.
+                    2. Se for alteração de texto ou funcional, gere JS dentro de <script>.
+                    3. Retorne APENAS o código puro, sem explicações e sem blocos de markdown (```).
+                    """
                     try:
-                        prompt = f"""
-                        CONTEXTO DO SITE: {st.session_state.url_atual}
-                        HTML ESTRUTURAL (Resumo): {st.session_state.codigo_fonte[:3500]}
+                        res = model.generate_content(prompt)
+                        novo_script = res.text.strip()
                         
-                        PEDIDO: {instrucao}
+                        # Limpeza extra de Markdown se a IA teimar em colocar
+                        for tag in ["```javascript", "```css", "```html", "```"]:
+                            novo_script = novo_script.replace(tag, "")
                         
-                        REGRAS:
-                        1. Responda APENAS com código CSS ou JavaScript puro.
-                        2. NÃO inclua explicações ou blocos de Markdown (```).
-                        3. Se for esconder algo, use seletores reais do HTML fornecido.
-                        """
-                        response = model.generate_content(prompt)
-                        codigo_gerado = limpar_codigo_ia(response.text)
-                        
-                        if codigo_gerado:
-                            # Acumula o script para manter alterações anteriores vivas
-                            st.session_state.scripts_aplicados += "\n" + codigo_gerado
-                            st.session_state.historico_scripts.append(codigo_gerado)
-                            st.rerun() # Atualiza o Sandbox imediatamente
-                        else:
-                            st.error("A IA devolveu um resultado vazio.")
+                        st.session_state.scripts_aplicados += "\n" + novo_script
+                        st.toast("Script aplicado ao Sandbox!", icon="✅")
                     except Exception as e:
                         st.error(f"Erro na IA: {e}")
             else:
-                st.error("Configure a API Key na barra lateral.")
+                st.warning("⚠️ Configure a API Key na barra lateral.")
         
-        # Histórico para conferência
-        if st.session_state.historico_scripts:
-            with st.expander("📄 Ver Scripts Aplicados"):
-                for s in st.session_state.historico_scripts:
-                    st.code(s, language="javascript")
-    else:
-        st.info("Analise um site primeiro para habilitar a IA.")
+        if st.button("🗑️ Limpar Sandbox"):
+            st.session_state.scripts_aplicados = ""
+            st.rerun()
 
-# Rodapé de Referência
-if st.session_state.url_atual:
-    st.caption(f"Referência Original: [Abrir {st.session_state.url_atual}]({st.session_state.url_atual})")
+with col1:
+    st.subheader("🧪 Sandbox em Tempo Real")
+    if st.session_state.codigo_fonte:
+        # Montagem do HTML com base na URL original para carregar imagens/estilos originais
+        # Injetamos o código da IA logo antes do fechamento do Body
+        html_completo = f"""
+        <html>
+            <head>
+                <base href="{st.session_state.url_atual}/">
+                <meta charset="UTF-8">
+            </head>
+            <body>
+                {st.session_state.codigo_fonte}
+                {st.session_state.scripts_aplicados}
+            </body>
+        </html>
+        """
+        st.components.v1.html(html_completo, height=700, scrolling=True)
+    else:
+        st.info("Insira uma URL acima para começar a editar.")
