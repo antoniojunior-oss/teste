@@ -2,11 +2,12 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import google.generativeai as genai
+import re
 
 # 1. Configuração da Página
 st.set_page_config(page_title="IA Dealer Pro - Sandbox", layout="wide", page_icon="🚗")
 
-# 2. IA - Carregamento
+# 2. IA - Carregamento Seguro
 def carregar_modelo_seguro(key):
     try:
         genai.configure(api_key=key)
@@ -37,23 +38,28 @@ if st.button("🔍 Clonar Site"):
             with st.spinner("Limpando e clonando estrutura..."):
                 headers = {'User-Agent': 'Mozilla/5.0'}
                 response = requests.get(url_input, headers=headers, timeout=10)
+                # Forçamos a codificação para evitar caracteres quebrados
+                response.encoding = 'utf-8'
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
-                # REMOÇÃO AGRESSIVA DE PESO:
-                # Removemos scripts, iframes e estilos inline gigantes que travam o buffer
-                for tag in soup(["script", "style", "iframe", "noscript", "svg", "link"]):
-                    # Mantemos apenas o CSS essencial se quiser, mas aqui vamos remover tudo para dar controle total à IA
+                # REMOÇÃO DE TAGS CONFLITANTES
+                for tag in soup(["script", "style", "iframe", "noscript", "svg", "link", "img"]):
                     tag.decompose()
                 
-                # Pegamos apenas o conteúdo do Body para ser mais leve
-                body_content = soup.find('body')
-                html_limpo = str(body_content.prettify()) if body_content else str(soup.prettify())
+                # Pega apenas o conteúdo visível (Body) e converte para string limpa
+                body = soup.find('body')
+                html_raw = str(body.get_text(separator="\n", strip=True)) if not body else "Erro ao ler body"
                 
+                # Criamos um HTML minimalista baseado no conteúdo
+                html_limpo = f"<div>{html_raw[:30000]}</div>" 
+                
+                # Removemos qualquer caractere que não seja texto comum para evitar o TypeError
+                html_limpo = re.sub(r'[^\x00-\x7f]',r' ', html_limpo)
+
                 st.session_state.url_atual = url_input
-                # Limite de 50k caracteres para garantir que o Streamlit não quebre
-                st.session_state.codigo_fonte = html_limpo[:50000] 
+                st.session_state.codigo_fonte = html_limpo
                 st.session_state.scripts_aplicados = "" 
-                st.success("Estrutura capturada! O Sandbox está leve e pronto.")
+                st.success("Estrutura capturada!")
                 st.rerun()
         except Exception as e:
             st.error(f"Erro ao acessar site: {e}")
@@ -65,29 +71,25 @@ col_sandbox, col_ia = st.columns([1.2, 0.8])
 with col_ia:
     st.subheader("🤖 Assistente IA")
     if st.session_state.codigo_fonte:
-        prompt_usuario = st.text_area("O que deseja mudar visualmente?", height=120)
+        prompt_usuario = st.text_area("O que deseja criar?", placeholder="Ex: Crie um título azul e um botão de contato.")
         
-        if st.button("✨ Otimizar e Aplicar"):
+        if st.button("✨ Gerar e Otimizar"):
             if model:
                 with st.spinner("IA processando..."):
-                    contexto = st.session_state.codigo_fonte[:5000] # Trecho para IA entender a estrutura
                     prompt = f"""
-                    Baseado no HTML abaixo, crie um código CSS/JS para atender o pedido.
-                    HTML: {contexto}
-                    SCRIPTS JÁ EXISTENTES: {st.session_state.scripts_aplicados}
-                    PEDIDO: {prompt_usuario}
-                    REGRAS: 
-                    1. Reuna e otimize tudo em um único bloco <style> e <script>.
-                    2. Retorne APENAS o código puro, sem explicações e sem blocos de código markdown (```).
+                    Contexto: {st.session_state.codigo_fonte[:2000]}
+                    Scripts Atuais: {st.session_state.scripts_aplicados}
+                    Pedido: {prompt_usuario}
+                    Regra: Retorne APENAS o código CSS/JS consolidado dentro de <style> e <script>. Sem markdown.
                     """
                     res = model.generate_content(prompt)
-                    st.session_state.scripts_aplicados = res.text.replace("```html", "").replace("```", "").strip()
+                    # Limpeza extra para garantir que a IA não mande lixo
+                    novo_codigo = res.text.replace("```html", "").replace("```", "").strip()
+                    st.session_state.scripts_aplicados = novo_codigo
                     st.rerun()
             else: st.warning("Insira a API Key.")
         
-        if st.button("🗑️ Resetar"):
-            st.session_state.scripts_aplicados = ""
-            st.rerun()
+        st.button("🗑️ Resetar", on_click=lambda: st.session_state.update({"scripts_aplicados": ""}))
 
 with col_sandbox:
     c1, c2 = st.columns([2, 1])
@@ -97,21 +99,12 @@ with col_sandbox:
         st.rerun()
 
     if st.session_state.codigo_fonte:
-        # Montagem do HTML Final (Leve)
-        html_final = f"""
-        <html>
-            <head>
-                <base href="{st.session_state.url_atual}/">
-                <meta charset="UTF-8">
-                <style>
-                    body {{ font-family: sans-serif; background: #f4f4f4; padding: 20px; }}
-                </style>
-            </head>
-            <body>
-                {st.session_state.codigo_fonte}
-                {st.session_state.scripts_aplicados}
-            </body>
-        </html>
-        """
-        # Renderização sem o Try/Except para vermos se há erro de sistema
-        st.components.v1.html(html_final, height=700, scrolling=True, key=f"sb_{st.session_state.sandbox_key}")
+        # A montagem da string final agora é protegida
+        html_render = f"<html><body>{st.session_state.codigo_fonte}{st.session_state.scripts_aplicados}</body></html>"
+        
+        st.components.v1.html(
+            html_render, 
+            height=600, 
+            scrolling=True, 
+            key=f"sandbox_{st.session_state.sandbox_key}"
+        )
