@@ -9,14 +9,24 @@ st.set_page_config(page_title="IA Dealer Pro - Sandbox", layout="wide", page_ico
 # 2. Funções de Suporte
 def carregar_modelo_seguro(key):
     try:
+        if not key:
+            return None
         genai.configure(api_key=key)
+        
+        # Tenta listar os modelos para validar a conexão
         modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        # Prioridade para o Flash 1.5 (mais rápido e eficiente para código)
+        
         for opcao in ['models/gemini-1.5-flash', 'models/gemini-1.5-pro']:
             if opcao in modelos:
                 return genai.GenerativeModel(opcao)
+        
+        if modelos:
+            return genai.GenerativeModel(modelos[0])
+            
         return None
-    except Exception:
+    except Exception as e:
+        # Exibe o erro real para sabermos o que está acontecendo
+        st.sidebar.error(f"Erro na API: {e}")
         return None
 
 def capturar_site(url):
