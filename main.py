@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import google.generativeai as genai
+import base64
 import re
 
 # 1. Configuração da Página
@@ -35,34 +36,27 @@ url_input = st.text_input("URL da Concessionária:", value=st.session_state.url_
 if st.button("🔍 Clonar Site"):
     if url_input:
         try:
-            with st.spinner("Limpando e clonando estrutura..."):
+            with st.spinner("Extraindo estrutura..."):
                 headers = {'User-Agent': 'Mozilla/5.0'}
                 response = requests.get(url_input, headers=headers, timeout=10)
-                # Forçamos a codificação para evitar caracteres quebrados
                 response.encoding = 'utf-8'
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
-                # REMOÇÃO DE TAGS CONFLITANTES
-                for tag in soup(["script", "style", "iframe", "noscript", "svg", "link", "img"]):
+                # Limpeza para evitar bugs de renderização
+                for tag in soup(["script", "style", "link", "img", "svg", "iframe"]):
                     tag.decompose()
                 
-                # Pega apenas o conteúdo visível (Body) e converte para string limpa
-                body = soup.find('body')
-                html_raw = str(body.get_text(separator="\n", strip=True)) if not body else "Erro ao ler body"
+                # Pegar o texto/estrutura essencial
+                corpo = soup.find('body')
+                texto_base = corpo.get_text(separator="\n", strip=True) if corpo else "Erro ao ler conteúdo."
                 
-                # Criamos um HTML minimalista baseado no conteúdo
-                html_limpo = f"<div>{html_raw[:30000]}</div>" 
-                
-                # Removemos qualquer caractere que não seja texto comum para evitar o TypeError
-                html_limpo = re.sub(r'[^\x00-\x7f]',r' ', html_limpo)
-
                 st.session_state.url_atual = url_input
-                st.session_state.codigo_fonte = html_limpo
+                st.session_state.codigo_fonte = f"<div>{texto_base[:20000]}</div>" 
                 st.session_state.scripts_aplicados = "" 
-                st.success("Estrutura capturada!")
+                st.success("Site clonado com sucesso!")
                 st.rerun()
         except Exception as e:
-            st.error(f"Erro ao acessar site: {e}")
+            st.error(f"Erro: {e}")
 
 st.divider()
 
@@ -71,40 +65,59 @@ col_sandbox, col_ia = st.columns([1.2, 0.8])
 with col_ia:
     st.subheader("🤖 Assistente IA")
     if st.session_state.codigo_fonte:
-        prompt_usuario = st.text_area("O que deseja criar?", placeholder="Ex: Crie um título azul e um botão de contato.")
+        prompt_usuario = st.text_area("O que deseja criar?", height=150)
         
         if st.button("✨ Gerar e Otimizar"):
             if model:
                 with st.spinner("IA processando..."):
                     prompt = f"""
-                    Contexto: {st.session_state.codigo_fonte[:2000]}
-                    Scripts Atuais: {st.session_state.scripts_aplicados}
-                    Pedido: {prompt_usuario}
-                    Regra: Retorne APENAS o código CSS/JS consolidado dentro de <style> e <script>. Sem markdown.
+                    HTML BASE: {st.session_state.codigo_fonte[:2000]}
+                    SCRIPTS EXISTENTES: {st.session_state.scripts_aplicados}
+                    PEDIDO: {prompt_usuario}
+                    REGRA: Retorne APENAS blocos <style> e <script> consolidados. Sem markdown.
                     """
                     res = model.generate_content(prompt)
-                    # Limpeza extra para garantir que a IA não mande lixo
-                    novo_codigo = res.text.replace("```html", "").replace("```", "").strip()
-                    st.session_state.scripts_aplicados = novo_codigo
+                    codigo = res.text.replace("```html", "").replace("```", "").strip()
+                    st.session_state.scripts_aplicados = codigo
                     st.rerun()
             else: st.warning("Insira a API Key.")
         
-        st.button("🗑️ Resetar", on_click=lambda: st.session_state.update({"scripts_aplicados": ""}))
+        if st.button("🗑️ Resetar"):
+            st.session_state.scripts_aplicados = ""
+            st.rerun()
 
 with col_sandbox:
-    c1, c2 = st.columns([2, 1])
-    c1.subheader("🧪 Sandbox")
-    if c2.button("🔄 Refresh"):
+    st.subheader("🧪 Sandbox")
+    if st.button("🔄 Refresh"):
         st.session_state.sandbox_key += 1
         st.rerun()
 
     if st.session_state.codigo_fonte:
-        # A montagem da string final agora é protegida
-        html_render = f"<html><body>{st.session_state.codigo_fonte}{st.session_state.scripts_aplicados}</body></html>"
+        # MONTAGEM BLINDADA COM BASE64
+        html_completo = f"""
+        <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body {{ font-family: sans-serif; padding: 20px; line-height: 1.6; color: #333; }}
+                </style>
+            </head>
+            <body>
+                {st.session_state.codigo_fonte}
+                {st.session_state.scripts_aplicados}
+            </body>
+        </html>
+        """
         
-        st.components.v1.html(
-            html_render, 
-            height=600, 
-            scrolling=True, 
-            key=f"sandbox_{st.session_state.sandbox_key}"
-        )
+        try:
+            # Converte para Base64 para o Streamlit não "ler" os caracteres e dar TypeError
+            b64_html = base64.b64encode(html_completo.encode('utf-8')).decode('utf-8')
+            src_data = f"data:text/html;base64,{b64_html}"
+            
+            # Usamos um iframe nativo via markdown para máxima compatibilidade
+            st.write(
+                f'<iframe src="{src_data}" width="100%" height="600" style="border:1px solid #ddd; border-radius:10px;"></iframe>',
+                unsafe_allow_html=True
+            )
+        except Exception as e:
+            st.error(f"Erro de renderização: {e}")
