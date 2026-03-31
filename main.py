@@ -120,36 +120,47 @@ with col_sandbox:
     # Cabeçalho do Sandbox com botão de Refresh
     c1, c2 = st.columns([0.8, 0.2])
     c1.subheader("🧪 Sandbox (Visualização)")
-    if c2.button("🔄 Refresh", help="Recarregar a página do sandbox"):
+    if c2.button("🔄 Refresh", help="Recarregar o sandbox"):
         st.session_state.refresh_key += 1
 
     if st.session_state.codigo_fonte:
-        # Montagem SEGURA sem f-string para evitar conflito com chaves {} do CSS/JS
-        html_cabecalho = """
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <base href=""" + f'"{st.session_state.url_atual}/"' + """>
-                <meta charset="UTF-8">
-                <style> body { margin: 0; padding: 0; } </style>
-            </head>
-            <body>
-        """
-        
-        html_rodape = """
-            </body>
-        </html>
-        """
-        
-        # Juntamos as partes manualmente
-        html_final = html_cabecalho + st.session_state.codigo_fonte + st.session_state.scripts_aplicados + html_rodape
-        
-        # Renderização com a chave de atualização
-        st.components.v1.html(
-            html_final, 
-            height=800, 
-            scrolling=True, 
-            key=f"sandbox_render_{st.session_state.refresh_key}"
-        )
+        try:
+            # 1. Garantimos que tudo seja STRING pura
+            url_str = str(st.session_state.url_atual)
+            html_original = str(st.session_state.codigo_fonte)
+            scripts_ia = str(st.session_state.scripts_aplicados)
+            
+            # 2. Criamos um template fixo
+            # Usamos placeholders como [URL] e [CORPO] para evitar conflitos de chaves { }
+            template_html = """
+<!DOCTYPE html>
+<html>
+    <head>
+        <base href="[URL_BASE]/">
+        <meta charset="UTF-8">
+        <style> 
+            body { margin: 0; padding: 0; overflow-x: hidden; } 
+        </style>
+    </head>
+    <body>
+        [CONTEUDO_ORIGINAL]
+        [SCRIPTS_CUSTOM]
+    </body>
+</html>
+"""
+            # 3. Fazemos a substituição manual (mais seguro que f-strings)
+            html_final = template_html.replace("[URL_BASE]", url_str)
+            html_final = html_final.replace("[CONTEUDO_ORIGINAL]", html_original)
+            html_final = html_final.replace("[SCRIPTS_CUSTOM]", scripts_ia)
+
+            # 4. Renderizamos com uma chave única para forçar o reload
+            st.components.v1.html(
+                html_final, 
+                height=800, 
+                scrolling=True, 
+                key=f"sandbox_stable_{st.session_state.refresh_key}"
+            )
+        except Exception as e:
+            st.error(f"Erro ao renderizar sandbox: {e}")
     else:
         st.info("Aguardando URL para gerar o ambiente de teste.")
