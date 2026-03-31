@@ -19,7 +19,7 @@ def carregar_modelo_seguro(key):
     except:
         return None
 
-# 3. Inicialização do Estado da Sessão
+# 3. Inicialização do Estado da Sessão (Essencial para evitar o TypeError)
 if "codigo_fonte" not in st.session_state:
     st.session_state.codigo_fonte = ""
 if "scripts_aplicados" not in st.session_state:
@@ -27,7 +27,7 @@ if "scripts_aplicados" not in st.session_state:
 if "url_atual" not in st.session_state:
     st.session_state.url_atual = ""
 if "sandbox_key" not in st.session_state:
-    st.session_state.sandbox_key = 0 # Para o botão de refresh
+    st.session_state.sandbox_key = 0
 
 # 4. Barra Lateral
 st.sidebar.title("⚙️ Painel de Controle")
@@ -47,7 +47,7 @@ if st.button("🔍 Clonar Site"):
                 response = requests.get(url_input, headers=headers, timeout=15)
                 soup = BeautifulSoup(response.text, 'html.parser')
                 st.session_state.url_atual = url_input
-                st.session_state.codigo_fonte = soup.prettify()
+                st.session_state.codigo_fonte = str(soup.prettify()) # Força ser string
                 st.session_state.scripts_aplicados = "" 
                 st.success("Site clonado!")
                 st.rerun()
@@ -56,7 +56,7 @@ if st.button("🔍 Clonar Site"):
 
 st.divider()
 
-col_sandbox, col_ia = st.columns([1.3, 0.7])
+col_sandbox, col_ia = st.columns([1.2, 0.8])
 
 with col_ia:
     st.subheader("🤖 Assistente de Edição")
@@ -66,34 +66,23 @@ with col_ia:
         if st.button("✨ Otimizar e Aplicar"):
             if model:
                 with st.spinner("IA Otimizando Scripts..."):
-                    # Aqui passamos os scripts antigos para a IA consolidar
                     scripts_atuais = st.session_state.scripts_aplicados
                     
                     prompt_final = f"""
-                    Você é um especialista em performance web. 
                     Tarefa: Criar um novo script ou atualizar os existentes.
-                    
-                    SCRIPTS JÁ EXISTENTES NO SANDBOX:
-                    {scripts_atuais if scripts_atuais else "Nenhum script aplicado ainda."}
-                    
-                    NOVA SOLICITAÇÃO:
-                    {prompt_usuario}
-                    
-                    REGRAS DE OTIMIZAÇÃO:
-                    1. Reuna tudo em um único bloco <style> e um único bloco <script> (se necessário).
-                    2. Remova seletores CSS duplicados ou redundantes.
-                    3. Se a nova solicitação alterar algo que já existe nos scripts anteriores, substitua a lógica antiga pela nova.
-                    4. Retorne APENAS o código puro otimizado. Sem markdown (```).
+                    SCRIPTS JÁ EXISTENTES: {scripts_atuais if scripts_atuais else "Nenhum."}
+                    NOVA SOLICITAÇÃO: {prompt_usuario}
+                    REGRAS: 
+                    - Reuna tudo em um único bloco <style> e um único bloco <script>.
+                    - Substitua lógicas antigas se a nova solicitação conflitar.
+                    - Retorne APENAS o código puro, sem markdown (```).
                     """
                     
                     try:
                         resposta = model.generate_content(prompt_final)
                         codigo_limpo = resposta.text.strip().replace("```html", "").replace("```javascript", "").replace("```css", "").replace("```", "")
-                        
-                        # Atualiza a sessão com o código CONSOLIDADO (não apenas somado)
                         st.session_state.scripts_aplicados = codigo_limpo
-                        st.toast("Scripts otimizados e aplicados!", icon="🛠️")
-                        time.sleep(0.5)
+                        st.toast("Scripts otimizados!", icon="🛠️")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Erro na IA: {e}")
@@ -103,37 +92,39 @@ with col_ia:
         if st.button("🗑️ Resetar Tudo"):
             st.session_state.scripts_aplicados = ""
             st.rerun()
-            
-        with st.expander("Ver Código Consolidado"):
-            st.code(st.session_state.scripts_aplicados, language="html")
 
 with col_sandbox:
-    header_sandbox = st.columns([1, 1])
-    header_sandbox[0].subheader("🧪 Sandbox")
-    
-    # BOTÃO DE REFRESH: Aumenta a key do componente para forçar o reload do iframe
-    if header_sandbox[1].button("🔄 Recarregar Sandbox"):
+    # Cabeçalho do Sandbox com botão de refresh
+    c1, c2 = st.columns([2, 1])
+    c1.subheader("🧪 Sandbox")
+    if c2.button("🔄 Refresh"):
         st.session_state.sandbox_key += 1
-        st.toast("Recarregando ambiente...")
+        st.rerun()
 
     if st.session_state.codigo_fonte:
+        # Criamos a string HTML fora da chamada da função para garantir que ela exista
         html_sandbox = f"""
-        <!DOCTYPE html>
         <html>
             <head>
                 <base href="{st.session_state.url_atual}/">
                 <meta charset="UTF-8">
             </head>
-            <body>
+            <body style="margin:0; padding:0;">
                 {st.session_state.codigo_fonte}
                 {st.session_state.scripts_aplicados}
             </body>
         </html>
         """
-        # A 'key' dinâmica faz o Streamlit entender que é um novo componente e recarrega
-        st.components.v1.html(
-            html_sandbox, 
-            height=800, 
-            scrolling=True, 
-            key=f"sandbox_v_{st.session_state.sandbox_key}"
-        )
+        
+        # Chamada segura do componente
+        try:
+            st.components.v1.html(
+                html_sandbox, 
+                height=700, 
+                scrolling=True, 
+                key=f"sb_{st.session_state.sandbox_key}" # Nome da chave mais curto
+            )
+        except Exception as e:
+            st.error("Erro ao renderizar o Sandbox. Tente resetar os scripts.")
+    else:
+        st.info("Aguardando clonagem do site...")
