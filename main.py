@@ -120,6 +120,8 @@ with col_sandbox:
     # Cabeçalho do Sandbox com botão de Refresh
     c1, c2 = st.columns([0.8, 0.2])
     c1.subheader("🧪 Sandbox (Visualização)")
+    
+    # Ao clicar em refresh, aumentamos o contador
     if c2.button("🔄 Refresh", help="Recarregar o sandbox"):
         st.session_state.refresh_key += 1
 
@@ -129,9 +131,10 @@ with col_sandbox:
             url_str = str(st.session_state.url_atual)
             html_original = str(st.session_state.codigo_fonte)
             scripts_ia = str(st.session_state.scripts_aplicados)
+            refresh_id = str(st.session_state.refresh_key)
             
-            # 2. Criamos um template fixo
-            # Usamos placeholders como [URL] e [CORPO] para evitar conflitos de chaves { }
+            # 2. Criamos o template
+            # Injetamos o [ID_REFRESH] como um comentário para forçar a atualização da string
             template_html = """
 <!DOCTYPE html>
 <html>
@@ -148,17 +151,17 @@ with col_sandbox:
     </body>
 </html>
 """
-            # 3. Fazemos a substituição manual (mais seguro que f-strings)
+            # 3. Substituições manuais seguras
             html_final = template_html.replace("[URL_BASE]", url_str)
             html_final = html_final.replace("[CONTEUDO_ORIGINAL]", html_original)
             html_final = html_final.replace("[SCRIPTS_CUSTOM]", scripts_ia)
+            html_final = html_final.replace("[ID_REFRESH]", refresh_id)
 
-            # 4. Renderizamos com uma chave única para forçar o reload
+            # 4. Renderizamos SEM o argumento 'key'
             st.components.v1.html(
                 html_final, 
                 height=800, 
-                scrolling=True, 
-                key=f"sandbox_stable_{st.session_state.refresh_key}"
+                scrolling=True
             )
         except Exception as e:
             st.error(f"Erro ao renderizar sandbox: {e}")
