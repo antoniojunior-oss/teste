@@ -167,3 +167,60 @@ with col_sandbox:
             st.error(f"Erro ao renderizar sandbox: {e}")
     else:
         st.info("Aguardando URL para gerar o ambiente de teste.")
+
+with col_ia:
+    st.subheader("🤖 Assistente de Edição")
+    if st.session_state.codigo_fonte:
+        prompt_usuario = st.text_area("O que você quer mudar?", 
+                                     placeholder="Ex: Deixe os botões arredondados e azuis...",
+                                     height=150)
+        
+        if st.button("✨ Aplicar/Otimizar Mudanças", use_container_width=True):
+            if model:
+                with st.spinner("IA otimizando código..."):
+                    # ... (Lógica de geração do Gemini que já definimos antes)
+                    contexto_html = st.session_state.codigo_fonte[:5000]
+                    script_atual = st.session_state.scripts_aplicados
+                    
+                    prompt_final = f"""
+                    Você é um desenvolvedor Front-end Senior. 
+                    CONTEXTO: Você já aplicou alguns scripts neste site.
+                    HTML BASE (RESUMIDO): {contexto_html}
+                    
+                    SCRIPTS JÁ EXISTENTES:
+                    {script_atual if script_atual else "Nenhum script aplicado ainda."}
+                    
+                    NOVA SOLICITAÇÃO: {prompt_usuario}
+                    
+                    TAREFA:
+                    1. Integre a nova solicitação ao código existente.
+                    2. Otimize o código: remova redundâncias e combine seletores.
+                    3. Retorne APENAS o código final consolidado dentro de <style> e <script>.
+                    4. Não use explicações nem markdown.
+                    """
+                    
+                    try:
+                        resposta = model.generate_content(prompt_final)
+                        codigo_ia = resposta.text.strip().replace("```html", "").replace("```javascript", "").replace("```css", "").replace("```", "")
+                        st.session_state.scripts_aplicados = codigo_ia
+                        st.toast("Scripts otimizados!", icon="🛠️")
+                        st.rerun() # Rerun para atualizar o visualizador e a lista de scripts
+                    except Exception as e:
+                        st.error(f"Erro na geração: {e}")
+            else:
+                st.warning("Insira a API Key.")
+
+        if st.button("🗑️ Resetar Tudo", use_container_width=True):
+            st.session_state.scripts_aplicados = ""
+            st.session_state.url_atual = ""
+            st.session_state.codigo_fonte = ""
+            st.rerun()
+
+        # --- NOVA SEÇÃO: SCRIPTS GERADOS ---
+        st.divider()
+        with st.expander("📄 Ver Scripts Gerados (Pronto para copiar)", expanded=True):
+            if st.session_state.scripts_aplicados:
+                st.info("Este é o código consolidado e otimizado pela IA:")
+                st.code(st.session_state.scripts_aplicados, language="html")
+            else:
+                st.write("Nenhum script gerado ainda.")
