@@ -124,21 +124,32 @@ with col_sandbox:
         st.session_state.refresh_key += 1
 
     if st.session_state.codigo_fonte:
-        # Montagem com a refresh_key injetada como comentário para forçar reload do iframe
-        html_sandbox = f"""
+        # Montagem SEGURA sem f-string para evitar conflito com chaves {} do CSS/JS
+        html_cabecalho = """
         <!DOCTYPE html>
         <html>
             <head>
-                <base href="{st.session_state.url_atual}/">
+                <base href=""" + f'"{st.session_state.url_atual}/"' + """>
                 <meta charset="UTF-8">
-                <style> body {{ margin: 0; padding: 0; }} </style>
+                <style> body { margin: 0; padding: 0; } </style>
             </head>
             <body>
-                {st.session_state.codigo_fonte}
-                {st.session_state.scripts_aplicados}
+        """
+        
+        html_rodape = """
             </body>
         </html>
         """
-        st.components.v1.html(html_sandbox, height=800, scrolling=True, key=f"sandbox_{st.session_state.refresh_key}")
+        
+        # Juntamos as partes manualmente
+        html_final = html_cabecalho + st.session_state.codigo_fonte + st.session_state.scripts_aplicados + html_rodape
+        
+        # Renderização com a chave de atualização
+        st.components.v1.html(
+            html_final, 
+            height=800, 
+            scrolling=True, 
+            key=f"sandbox_render_{st.session_state.refresh_key}"
+        )
     else:
-        st.info("Aguardando URL.")
+        st.info("Aguardando URL para gerar o ambiente de teste.")
