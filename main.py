@@ -9,38 +9,28 @@ st.set_page_config(page_title="IA Dealer Pro - Sandbox", layout="wide", page_ico
 # 2. Funções de Suporte
 def carregar_modelo_seguro(key):
     try:
-        if not key:
-            return None
+        if not key: return None
         genai.configure(api_key=key)
-        
-        # Tenta listar os modelos para validar a conexão
         modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
         for opcao in ['models/gemini-1.5-flash', 'models/gemini-1.5-pro']:
-            if opcao in modelos:
-                return genai.GenerativeModel(opcao)
-        
-        if modelos:
-            return genai.GenerativeModel(modelos[0])
-            
-        return None
+            if opcao in modelos: return genai.GenerativeModel(opcao)
+        return genai.GenerativeModel(modelos[0]) if modelos else None
     except Exception as e:
-        # Exibe o erro real para sabermos o que está acontecendo
         st.sidebar.error(f"Erro na API: {e}")
         return None
 
 def capturar_site(url):
-    """Clona o HTML da URL e limpa scripts de rastreamento."""
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Limpeza de scripts que podem travar o sandbox ou monitorar cliques reais
-        for s in soup(['script', 'iframe']):
-            src = s.get('src', '')
-            if any(x in src for x in ['google-analytics', 'facebook', 'hotjar', 'gtm']):
+        # Limpeza agressiva para performance do sandbox
+        for s in soup(['iframe', 'noscript']): s.decompose()
+        for s in soup.find_all('script', src=True):
+            src = s.get('src', '').lower()
+            if any(x in src for x in ['google-analytics', 'facebook', 'hotjar', 'gtm', 'pixel']):
                 s.decompose()
         
         return soup.prettify()
@@ -48,142 +38,91 @@ def capturar_site(url):
         st.error(f"Erro ao capturar site: {e}")
         return None
 
-# 3. Inicialização do Estado da Sessão
-if "codigo_fonte" not in st.session_state:
-    st.session_state.codigo_fonte = ""
-if "scripts_aplicados" not in st.session_state:
-    st.session_state.scripts_aplicados = ""
-if "url_atual" not in st.session_state:
-    st.session_state.url_atual = ""
-if "refresh_count" not in st.session_state:
-    st.session_state.refresh_count = 0
+# 3. Inicialização do Estado
+for key in ["codigo_fonte", "scripts_aplicados", "url_atual", "refresh_count"]:
+    if key not in st.session_state: st.session_state[key] = "" if key != "refresh_count" else 0
 
 # 4. Barra Lateral
 st.sidebar.title("⚙️ Painel de Controle")
-api_key = st.sidebar.text_input("Gemini API Key", type="password", help="Obtenha em aistudio.google.com")
+api_key = st.sidebar.text_input("Gemini API Key", type="password")
 model = carregar_modelo_seguro(api_key) if api_key else None
 
-if model:
-    st.sidebar.success(f"Modelo Ativo: {model.model_name}")
-else:
-    st.sidebar.warning("Aguardando API Key válida...")
-
 # 5. Interface Principal
-st.title("🚗 IA Dealer: Editor & Sandbox")
-
-url_input = st.text_input("URL da Concessionária:", value=st.session_state.url_atual, placeholder="https://www.site.com.br")
+st.title("🚗 IA Dealer: Editor & Otimizador")
+url_input = st.text_input("URL da Concessionária:", value=st.session_state.url_atual)
 
 if st.button("🔍 Clonar Novo Site"):
     if url_input:
         with st.spinner("Capturando estrutura..."):
             html_clonado = capturar_site(url_input)
             if html_clonado:
-                st.session_state.url_atual = url_input
-                st.session_state.codigo_fonte = html_clonado
-                st.session_state.scripts_aplicados = "" 
-                st.success("Site clonado!")
+                st.session_state.url_atual, st.session_state.codigo_fonte = url_input, html_clonado
+                st.session_state.scripts_aplicados = ""
                 st.rerun()
 
 st.divider()
-
-# 6. Layout de Colunas
-col_sandbox, col_ia = st.columns([1.2, 0.8])
+col_sandbox, col_ia = st.columns([1.1, 0.9])
 
 with col_ia:
-    st.subheader("🤖 Assistente de Edição")
+    st.subheader("🤖 Assistente de Edição Inteligente")
     if st.session_state.codigo_fonte:
-        prompt_usuario = st.text_area("O que você quer mudar?", 
-                                     placeholder="Ex: Se o cliente escolher a opção X, redirecione para o link Y...",
-                                     height=150)
+        prompt_usuario = st.text_area("Descreva a alteração:", placeholder="Ex: Mudar cor do botão de conversão para verde e disparar alert ao clicar", height=120)
         
-        if st.button("✨ Aplicar/Otimizar Mudanças", use_container_width=True):
+        if st.button("✨ Gerar e Otimizar para PageSpeed", use_container_width=True):
             if model:
-                with st.spinner("IA processando e otimizando código..."):
-                    # Enviamos um resumo do HTML para a IA entender o contexto
-                    contexto_html = st.session_state.codigo_fonte[:6000]
-                    script_atual = st.session_state.scripts_aplicados
+                with st.spinner("Passo 1: Criando lógica..."):
+                    contexto_html = st.session_state.codigo_fonte[:7000]
                     
-                    prompt_final = f"""
-                    Atue como Desenvolvedor Front-end Sênior.
-                    OBJETIVO: Modificar o comportamento/visual de um site de concessionária.
+                    # PROMPT 1: GERAÇÃO DE LÓGICA
+                    p1 = f"""Atue como Dev Sênior. Crie apenas o código de alteração (CSS/JS) para: {prompt_usuario}.
+                    HTML Contexto: {contexto_html}
+                    REGRAS: 
+                    1. NÃO repita o HTML base. 
+                    2. Retorne APENAS as tags <style> e <script>.
+                    3. Se for JS, use seletores específicos."""
                     
-                    HTML BASE (trecho): {contexto_html}
+                    res1 = model.generate_content(p1).text
                     
-                    CÓDIGO JÁ EXISTENTE (Otimize-o se necessário): 
-                    {script_atual if script_atual else "Nenhum código aplicado ainda."}
+                with st.spinner("Passo 2: Otimizando Performance..."):
+                    # PROMPT 2: OTIMIZAÇÃO E LIMPEZA (PAGESPEED)
+                    p2 = f"""Atue como Especialista em Web Performance. 
+                    Otimize o código abaixo para ter impacto ZERO no PageSpeed:
+                    CÓDIGO: {res1}
                     
-                    NOVO PEDIDO DO USUÁRIO: {prompt_usuario}
+                    REGRAS DE OTIMIZAÇÃO:
+                    1. Minifique o CSS e JS.
+                    2. Use 'DOMContentLoaded' para não bloquear a renderização.
+                    3. Remova qualquer comentário ou espaço desnecessário.
+                    4. Retorne EXCLUSIVAMENTE o código final dentro das tags <style> e <script>.
+                    5. NUNCA inclua markdown como ```html."""
                     
-                    REGRAS:
-                    1. Consolide o novo pedido com o código antigo em um bloco único e limpo.
-                    2. Use <style> para CSS e <script> para JavaScript.
-                    3. Retorne APENAS o código puro. Sem explicações, sem markdown (```).
-                    """
+                    res2 = model.generate_content(p2).text
                     
-                    try:
-                        resposta = model.generate_content(prompt_final)
-                        codigo_ia = resposta.text.strip().replace("```html", "").replace("```javascript", "").replace("```css", "").replace("```", "")
-                        
-                        # Sobrescreve com a versão otimizada
-                        st.session_state.scripts_aplicados = codigo_ia
-                        st.toast("Alterações aplicadas com sucesso!", icon="🚀")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro na IA: {e}")
-            else:
-                st.error("ERRO: Você precisa inserir a API Key na barra lateral!")
-
-        if st.button("🗑️ Resetar Tudo", use_container_width=True):
-            st.session_state.scripts_aplicados = ""
-            st.session_state.codigo_fonte = ""
-            st.session_state.url_atual = ""
-            st.rerun()
-
-        st.divider()
-        with st.expander("📄 Scripts Inseridos (Copiar Código)", expanded=True):
-            if st.session_state.scripts_aplicados:
-                st.code(st.session_state.scripts_aplicados, language="html")
-            else:
-                st.info("Nenhum script gerado ainda.")
-
-with col_sandbox:
-    header_col, refresh_col = st.columns([0.7, 0.3])
-    header_col.subheader("🧪 Sandbox")
-    
-    # Refresh funcional: Recarrega o HTML original mantendo o JS da IA
-    if refresh_col.button("🔄 Refresh", use_container_width=True):
-        if st.session_state.url_atual:
-            with st.spinner("Recarregando fonte..."):
-                novo_html = capturar_site(st.session_state.url_atual)
-                if novo_html:
-                    st.session_state.codigo_fonte = novo_html
-                    st.session_state.refresh_count += 1
+                    # Limpeza final via Regex/String
+                    limpo = res2.replace("```html", "").replace("```javascript", "").replace("```css", "").replace("```", "").strip()
+                    
+                    st.session_state.scripts_aplicados = limpo
+                    st.toast("Código otimizado aplicado!", icon="⚡")
                     st.rerun()
 
-    if st.session_state.codigo_fonte:
-        try:
-            # Template seguro usando replace para evitar erro de chaves {}
-            template_sandbox = """
-<!DOCTYPE html>
-<html>
-    <head>
-        <base href="[URL_BASE]/">
-        <meta charset="UTF-8">
-        <style> body { margin: 0; padding: 0; } </style>
-        </head>
-    <body>
-        [CONTEUDO_HTML]
-        [SCRIPTS_IA]
-    </body>
-</html>
-"""
-            html_final = template_sandbox.replace("[URL_BASE]", str(st.session_state.url_atual))
-            html_final = html_final.replace("[CONTEUDO_HTML]", str(st.session_state.codigo_fonte))
-            html_final = html_final.replace("[SCRIPTS_IA]", str(st.session_state.scripts_aplicados))
-            html_final = html_final.replace("[REF_ID]", str(st.session_state.refresh_count))
+        if st.session_state.scripts_aplicados:
+            with st.expander("📄 Código Otimizado (Pronto para GTM/Site)", expanded=False):
+                st.code(st.session_state.scripts_aplicados, language="html")
 
-            st.components.v1.html(html_final, height=800, scrolling=True)
-        except Exception as e:
-            st.error(f"Erro na renderização: {e}")
-    else:
-        st.info("Insira uma URL para começar.")
+with col_sandbox:
+    st.subheader("🧪 Sandbox")
+    if st.session_state.codigo_fonte:
+        template = f"""
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <base href="{st.session_state.url_atual}/">
+                <meta charset="UTF-8">
+            </head>
+            <body>
+                {st.session_state.codigo_fonte}
+                {st.session_state.scripts_aplicados}
+            </body>
+        </html>
+        """
+        st.components.v1.html(template, height=800, scrolling=True)
