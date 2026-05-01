@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IA Dealer Pro — Autoforce Sandbox</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --blue-900: #0a1628;
+      --blue-800: #0d2042;
+      --blue-700: #0f2d5e;
+      --blue-600: #1a3f82;
+      --blue-500: #1d4ed8;
+      --blue-400: #3b82f6;
+      --blue-300: #60a5fa;
+      --blue-100: #dbeafe;
+      --blue-50:  #eff6ff;
+      --white: #ffffff;
+      --gray-50:  #f8fafc;
+      --gray-100: #f1f5f9;
+      --gray-200: #e2e8f0;
+      --gray-400: #94a3b8;
+      --gray-500: #64748b;
+      --gray-700: #334155;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56,189,248,0.25);
+      --success: #22c55e;
+      --error: #ef4444;
+      --panel-bg: rgba(255,255,255,0.96);
+      --panel-border: rgba(26,63,130,0.12);
+      --shadow-card: 0 4px 24px rgba(10,22,40,0.10), 0 1px 4px rgba(10,22,40,0.06);
+      --shadow-float: 0 16px 48px rgba(10,22,40,0.18), 0 2px 8px rgba(10,22,40,0.08);
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--blue-900);
+      color: var(--white);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Background mesh ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 10% 0%, rgba(29,78,216,0.28) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 90% 100%, rgba(56,189,248,0.15) 0%, transparent 55%),
+        radial-gradient(ellipse 40% 40% at 50% 50%, rgba(13,32,66,0.60) 0%, transparent 80%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Grid lines decoration ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(59,130,246,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59,130,246,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app-wrapper {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ── TOP NAV ── */
+    .topnav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      height: 60px;
+      background: rgba(10,22,40,0.72);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(59,130,246,0.15);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .topnav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--blue-500), var(--accent));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      box-shadow: 0 0 16px var(--accent-glow);
+    }
+
+    .logo-text {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 17px;
+      letter-spacing: -0.3px;
+      color: var(--white);
+    }
+    .logo-text span { color: var(--accent); }
+
+    .topnav-badge {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: rgba(56,189,248,0.12);
+      border: 1px solid rgba(56,189,248,0.3);
+      border-radius: 20px;
+      padding: 2px 10px;
+    }
+
+    .topnav-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--gray-500);
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+    .status-dot.active {
+      background: var(--success);
+      box-shadow: 0 0 8px rgba(34,197,94,0.6);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .status-label {
+      font-size: 12px;
+      color: var(--gray-400);
+    }
+    .status-label.active { color: var(--success); }
+
+    /* ── MAIN LAYOUT ── */
+    .main-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      grid-template-rows: auto 1fr;
+      gap: 0;
+      flex: 1;
+      height: calc(100vh - 60px);
+    }
+
+    /* ── URL BAR (full width) ── */
+    .url-bar-row {
+      grid-column: 1 / -1;
+      padding: 16px 24px;
+      background: rgba(10,22,40,0.5);
+      border-bottom: 1px solid rgba(59,130,246,0.1);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .url-input-wrap {
+      flex: 1;
+      position: relative;
+    }
+
+    .url-input-wrap .input-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--blue-400);
+      font-size: 14px;
+      pointer-events: none;
+    }
+
+    .url-input {
+      width: 100%;
+      height: 42px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(59,130,246,0.2);
+      border-radius: var(--radius-sm);
+      color: var(--white);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13.5px;
+      padding: 0 14px 0 38px;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    }
+    .url-input::placeholder { color: var(--gray-500); }
+    .url-input:focus {
+      border-color: var(--blue-400);
+      background: rgba(255,255,255,0.08);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+    }
+
+    .btn {
+      height: 42px;
+      padding: 0 20px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      transition: all 0.18s;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--blue-500), var(--blue-600));
+      color: var(--white);
+      box-shadow: 0 2px 12px rgba(29,78,216,0.35);
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, var(--blue-400), var(--blue-500));
+      box-shadow: 0 4px 20px rgba(29,78,216,0.5);
+      transform: translateY(-1px);
+    }
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-ghost {
+      background: rgba(255,255,255,0.06);
+      color: var(--gray-400);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .btn-ghost:hover {
+      background: rgba(255,255,255,0.10);
+      color: var(--white);
+    }
+
+    .btn-danger {
+      background: rgba(239,68,68,0.1);
+      color: #fca5a5;
+      border: 1px solid rgba(239,68,68,0.2);
+    }
+    .btn-danger:hover {
+      background: rgba(239,68,68,0.18);
+    }
+
+    /* ── SIDEBAR (Control Panel) ── */
+    .sidebar {
+      background: rgba(10,22,40,0.7);
+      border-right: 1px solid rgba(59,130,246,0.1);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-track { background: transparent; }
+    .sidebar::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.3); border-radius: 4px; }
+
+    .sidebar-section {
+      padding: 20px;
+      border-bottom: 1px solid rgba(59,130,246,0.08);
+    }
+
+    .section-label {
+      font-family: 'Syne', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--blue-400);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(59,130,246,0.2);
+    }
+
+    /* API Key field */
+    .field-label {
+      font-size: 11.5px;
+      color: var(--gray-400);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .api-input-wrap { position: relative; }
+
+    .api-input {
+      width: 100%;
+      height: 38px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(59,130,246,0.18);
+      border-radius: var(--radius-sm);
+      color: var(--white);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      padding: 0 38px 0 12px;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .api-input::placeholder { color: var(--gray-500); font-size: 12px; }
+    .api-input:focus {
+      border-color: var(--blue-400);
+      background: rgba(255,255,255,0.07);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+    }
+
+    .api-toggle {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--gray-500);
+      cursor: pointer;
+      padding: 2px;
+      font-size: 13px;
+      transition: color 0.2s;
+    }
+    .api-toggle:hover { color: var(--blue-300); }
+
+    .api-status {
+      margin-top: 8px;
+      font-size: 11.5px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--gray-500);
+    }
+    .api-status.ok { color: var(--success); }
+    .api-status.err { color: var(--error); }
+
+    /* ── IA Prompt Area ── */
+    .prompt-area {
+      width: 100%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(59,130,246,0.18);
+      border-radius: var(--radius-sm);
+      color: var(--white);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      line-height: 1.55;
+      padding: 11px 13px;
+      outline: none;
+      resize: none;
+      transition: all 0.2s;
+      min-height: 110px;
+    }
+    .prompt-area::placeholder { color: var(--gray-500); }
+    .prompt-area:focus {
+      border-color: var(--blue-400);
+      background: rgba(255,255,255,0.07);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+    }
+
+    /* Quick chips */
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .chip {
+      font-size: 11px;
+      padding: 4px 10px;
+      background: rgba(29,78,216,0.12);
+      border: 1px solid rgba(29,78,216,0.25);
+      border-radius: 20px;
+      color: var(--blue-300);
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .chip:hover {
+      background: rgba(29,78,216,0.22);
+      border-color: var(--blue-400);
+      color: var(--white);
+    }
+
+    /* Btn full width */
+    .btn-full {
+      width: 100%;
+      height: 44px;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    /* Loading state */
+    .btn-loading {
+      pointer-events: none;
+      opacity: 0.75;
+    }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: var(--white);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Code output */
+    .code-panel {
+      background: rgba(5,14,30,0.8);
+      border: 1px solid rgba(59,130,246,0.15);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
+    .code-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 13px;
+      background: rgba(29,78,216,0.08);
+      border-bottom: 1px solid rgba(59,130,246,0.12);
+    }
+
+    .code-panel-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: var(--blue-300);
+      font-family: 'Syne', sans-serif;
+      text-transform: uppercase;
+    }
+
+    .copy-btn {
+      font-size: 11px;
+      padding: 3px 9px;
+      height: 24px;
+      border-radius: 5px;
+      gap: 4px;
+    }
+
+    .code-scroll {
+      max-height: 200px;
+      overflow-y: auto;
+      padding: 12px;
+    }
+    .code-scroll::-webkit-scrollbar { width: 4px; }
+    .code-scroll::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.3); border-radius: 4px; }
+
+    .code-scroll pre {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 11.5px;
+      line-height: 1.6;
+      color: #7dd3fc;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .empty-code {
+      font-size: 12px;
+      color: var(--gray-500);
+      padding: 20px;
+      text-align: center;
+      font-style: italic;
+    }
+
+    /* ── SANDBOX AREA ── */
+    .sandbox-area {
+      display: flex;
+      flex-direction: column;
+      background: var(--gray-100);
+      overflow: hidden;
+    }
+
+    .sandbox-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 18px;
+      background: rgba(10,22,40,0.65);
+      border-bottom: 1px solid rgba(59,130,246,0.12);
+      flex-shrink: 0;
+    }
+
+    .sandbox-tabs {
+      display: flex;
+      gap: 2px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 7px;
+      padding: 3px;
+    }
+
+    .sandbox-tab {
+      font-size: 12px;
+      padding: 5px 14px;
+      border-radius: 5px;
+      cursor: pointer;
+      color: var(--gray-400);
+      transition: all 0.15s;
+      border: none;
+      background: none;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+    }
+    .sandbox-tab.active {
+      background: var(--blue-600);
+      color: var(--white);
+      box-shadow: 0 1px 6px rgba(29,78,216,0.4);
+    }
+
+    .sandbox-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .sandbox-url-pill {
+      font-size: 11px;
+      color: var(--gray-400);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 20px;
+      padding: 3px 12px;
+      max-width: 260px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .sandbox-frame-wrap {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .sandbox-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #fff;
+      display: block;
+    }
+
+    /* Empty sandbox state */
+    .sandbox-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 16px;
+      color: var(--gray-500);
+    }
+
+    .sandbox-empty-icon {
+      width: 72px; height: 72px;
+      border-radius: 20px;
+      background: rgba(29,78,216,0.08);
+      border: 1.5px dashed rgba(59,130,246,0.25);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+    }
+
+    .sandbox-empty h3 {
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--gray-400);
+    }
+
+    .sandbox-empty p {
+      font-size: 13px;
+      color: var(--gray-500);
+      text-align: center;
+      max-width: 280px;
+      line-height: 1.5;
+    }
+
+    /* ── TOAST ── */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toast {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 18px;
+      background: var(--blue-800);
+      border: 1px solid rgba(59,130,246,0.3);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-float);
+      font-size: 13px;
+      color: var(--white);
+      min-width: 260px;
+      animation: toastIn 0.25s ease;
+    }
+    .toast.success { border-color: rgba(34,197,94,0.4); }
+    .toast.error { border-color: rgba(239,68,68,0.4); }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── MODAL overlay (for loading) ── */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10,22,40,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 500;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .overlay.show { display: flex; }
+
+    .overlay-card {
+      background: var(--blue-800);
+      border: 1px solid rgba(59,130,246,0.3);
+      border-radius: var(--radius);
+      padding: 36px 48px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      box-shadow: var(--shadow-float);
+    }
+
+    .overlay-spinner {
+      width: 40px; height: 40px;
+      border: 3px solid rgba(59,130,246,0.2);
+      border-top-color: var(--blue-400);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .overlay-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .overlay-sub {
+      font-size: 13px;
+      color: var(--gray-400);
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: rgba(59,130,246,0.08);
+      margin: 4px 0;
+    }
+
+    /* Scrollbar global */
+    * { scrollbar-width: thin; scrollbar-color: rgba(59,130,246,0.25) transparent; }
+  </style>
+</head>
+<body>
+
+<div class="app-wrapper">
+
+  <!-- TOP NAV -->
+  <nav class="topnav">
+    <div class="topnav-logo">
+      <div class="logo-icon">🚗</div>
+      <span class="logo-text">IA<span>Dealer</span> Pro</span>
+    </div>
+    <div class="topnav-right" style="gap:12px">
+      <div id="statusDot" class="status-dot"></div>
+      <span id="statusLabel" class="status-label">API desconectada</span>
+    </div>
+  </nav>
+
+  <!-- MAIN GRID -->
+  <div class="main-layout">
+
+    <!-- URL BAR (spans full row) -->
+    <div class="url-bar-row">
+      <div class="url-input-wrap">
+        <span class="input-icon">🔗</span>
+        <input class="url-input" id="urlInput" type="text"
+          placeholder="https://www.concessionaria.com.br" />
+      </div>
+      <button class="btn btn-primary" id="cloneBtn">
+        <span>🔍</span> Clonar Site
+      </button>
+      <button class="btn btn-ghost" id="refreshBtn">
+        <span>🔄</span> Refresh
+      </button>
+      <button class="btn btn-danger" id="resetBtn">
+        <span>🗑️</span> Resetar
+      </button>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+      <!-- API KEY -->
+      <div class="sidebar-section">
+        <div class="section-label">⚙️ Configuração</div>
+        <div class="field-label">Gemini API Key</div>
+        <div class="api-input-wrap">
+          <input class="api-input" id="apiKey" type="password"
+            placeholder="Cole sua chave do aistudio.google.com" />
+          <button class="api-toggle" id="apiToggle" title="Mostrar/ocultar">👁</button>
+        </div>
+        <div class="api-status" id="apiStatus">
+          <span>●</span> Aguardando chave...
+        </div>
+      </div>
+
+      <!-- AI ASSISTANT -->
+      <div class="sidebar-section" style="flex:1">
+        <div class="section-label">🤖 Assistente IA</div>
+        <div class="field-label">O que você quer alterar?</div>
+        <textarea class="prompt-area" id="promptInput"
+          placeholder="Ex: Mude a cor do botão de envio para azul e adicione uma animação de hover com sombra..."
+        ></textarea>
+
+        <!-- Quick chips -->
+        <div class="chips">
+          <span class="chip" onclick="fillChip(this)">Mudar cor CTA</span>
+          <span class="chip" onclick="fillChip(this)">Adicionar banner</span>
+          <span class="chip" onclick="fillChip(this)">Pop-up de oferta</span>
+          <span class="chip" onclick="fillChip(this)">Chat flutuante</span>
+          <span class="chip" onclick="fillChip(this)">Countdown timer</span>
+          <span class="chip" onclick="fillChip(this)">Formulário lead</span>
+        </div>
+
+        <div style="height:12px"></div>
+
+        <button class="btn btn-primary btn-full" id="applyBtn">
+          <span>✨</span> Aplicar & Otimizar
+        </button>
+
+        <div style="height:8px"></div>
+
+        <!-- Code output -->
+        <div class="code-panel">
+          <div class="code-panel-header">
+            <span class="code-panel-title">📄 Script Gerado</span>
+            <button class="btn btn-ghost copy-btn" id="copyBtn">
+              <span>📋</span> Copiar
+            </button>
+          </div>
+          <div class="code-scroll" id="codeOutput">
+            <div class="empty-code">Nenhum script gerado ainda.</div>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- SANDBOX -->
+    <section class="sandbox-area">
+      <div class="sandbox-topbar">
+        <div class="sandbox-tabs">
+          <button class="sandbox-tab active" id="tabPreview">Prévia</button>
+          <button class="sandbox-tab" id="tabSource">Código-fonte</button>
+        </div>
+        <div class="sandbox-actions">
+          <span class="sandbox-url-pill" id="sandboxUrlPill">Nenhum site clonado</span>
+        </div>
+      </div>
+
+      <div class="sandbox-frame-wrap" id="sandboxWrap">
+        <!-- Empty state -->
+        <div class="sandbox-empty" id="sandboxEmpty">
+          <div class="sandbox-empty-icon">🌐</div>
+          <h3>Sandbox vazio</h3>
+          <p>Cole a URL de uma concessionária e clique em <strong>Clonar Site</strong> para começar.</p>
+        </div>
+        <iframe id="sandboxFrame" class="sandbox-iframe" style="display:none"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+        <pre id="sourceView" style="display:none; padding:16px; font-size:12px; color:#7dd3fc; overflow:auto; height:100%; background:#050e1e; font-family: 'Fira Code', monospace; white-space:pre-wrap; word-break:break-all;"></pre>
+      </div>
+    </section>
+
+  </div><!-- /main-layout -->
+</div><!-- /app-wrapper -->
+
+<!-- Loading Overlay -->
+<div class="overlay" id="loadingOverlay">
+  <div class="overlay-card">
+    <div class="overlay-spinner"></div>
+    <div class="overlay-title" id="overlayTitle">Processando...</div>
+    <div class="overlay-sub" id="overlaySub">Aguarde um momento</div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+
+<script>
+  // ─── STATE ───────────────────────────────────────────────
+  const state = {
+    url: '',
+    htmlSource: '',
+    appliedScripts: '',
+    apiKey: '',
+    tab: 'preview',
+  };
+
+  // ─── ELEMENTS ────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const urlInput    = $('urlInput');
+  const apiKeyInput = $('apiKey');
+  const promptInput = $('promptInput');
+  const sandboxFrame= $('sandboxFrame');
+  const sandboxEmpty= $('sandboxEmpty');
+  const sourceView  = $('sourceView');
+  const codeOutput  = $('codeOutput');
+  const statusDot   = $('statusDot');
+  const statusLabel = $('statusLabel');
+  const urlPill     = $('sandboxUrlPill');
+
+  // ─── API KEY ─────────────────────────────────────────────
+  apiKeyInput.addEventListener('input', () => {
+    state.apiKey = apiKeyInput.value.trim();
+    updateApiStatus();
+  });
+
+  $('apiToggle').addEventListener('click', () => {
+    const t = apiKeyInput.type === 'password' ? 'text' : 'password';
+    apiKeyInput.type = t;
+    $('apiToggle').textContent = t === 'password' ? '👁' : '🙈';
+  });
+
+  function updateApiStatus() {
+    const el = $('apiStatus');
+    if (state.apiKey.length > 10) {
+      el.className = 'api-status ok';
+      el.innerHTML = '<span>●</span> Chave inserida';
+      statusDot.className = 'status-dot active';
+      statusLabel.className = 'status-label active';
+      statusLabel.textContent = 'API pronta';
+    } else {
+      el.className = 'api-status';
+      el.innerHTML = '<span>●</span> Aguardando chave...';
+      statusDot.className = 'status-dot';
+      statusLabel.className = 'status-label';
+      statusLabel.textContent = 'API desconectada';
+    }
+  }
+
+  // ─── CLONE SITE ──────────────────────────────────────────
+  $('cloneBtn').addEventListener('click', async () => {
+    const url = urlInput.value.trim();
+    if (!url) { toast('Insira uma URL válida.', 'error'); return; }
+
+    showOverlay('Clonando site...', 'Capturando e limpando HTML...');
+    try {
+      // Using a CORS proxy for demo; in production, the Python backend handles this
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxyUrl);
+      const data = await res.json();
+      if (!data.contents) throw new Error('Conteúdo vazio');
+
+      state.url = url;
+      state.htmlSource = data.contents;
+      state.appliedScripts = '';
+      urlInput.value = url;
+      urlPill.textContent = url.replace(/^https?:\/\//, '').slice(0, 40);
+
+      renderSandbox();
+      updateCodePanel();
+      toast('✅ Site clonado com sucesso!', 'success');
+    } catch (e) {
+      // Fallback: render in iframe directly
+      state.url = url;
+      state.htmlSource = `<iframe src="${url}" style="width:100%;height:100%;border:none;"></iframe>`;
+      urlPill.textContent = url.replace(/^https?:\/\//, '').slice(0, 40);
+      renderSandbox();
+      toast('Site carregado no iframe.', 'success');
+    } finally {
+      hideOverlay();
+    }
+  });
+
+  // ─── REFRESH ─────────────────────────────────────────────
+  $('refreshBtn').addEventListener('click', () => {
+    if (!state.url) { toast('Nenhum site para recarregar.', 'error'); return; }
+    $('cloneBtn').click();
+  });
+
+  // ─── RESET ───────────────────────────────────────────────
+  $('resetBtn').addEventListener('click', () => {
+    state.url = '';
+    state.htmlSource = '';
+    state.appliedScripts = '';
+    urlInput.value = '';
+    urlPill.textContent = 'Nenhum site clonado';
+    sandboxFrame.style.display = 'none';
+    sourceView.style.display = 'none';
+    sandboxEmpty.style.display = 'flex';
+    updateCodePanel();
+    toast('Estado resetado.', 'success');
+  });
+
+  // ─── APPLY & OPTIMIZE ────────────────────────────────────
+  $('applyBtn').addEventListener('click', async () => {
+    const prompt = promptInput.value.trim();
+    if (!prompt) { toast('Descreva a alteração desejada.', 'error'); return; }
+    if (!state.apiKey) { toast('Insira sua Gemini API Key.', 'error'); return; }
+    if (!state.htmlSource) { toast('Clone um site primeiro.', 'error'); return; }
+
+    const btn = $('applyBtn');
+    btn.innerHTML = '<div class="spinner"></div> Gerando...';
+    btn.classList.add('btn-loading');
+    showOverlay('IA Pensando...', 'Refinando e otimizando o código');
+
+    try {
+      const contextoHtml = state.htmlSource.slice(0, 8000);
+      const scriptAtual = state.appliedScripts || 'Nenhum.';
+
+      const promptFinal = `Atue como Desenvolvedor Front-end Sênior focado em Web Performance (Core Web Vitals).
+OBJETIVO: Implementar a mudança solicitada de forma extremamente leve.
+CONTEXTO HTML: ${contextoHtml}
+CÓDIGO ATUAL PARA MELHORAR: ${scriptAtual}
+PEDIDO DO USUÁRIO: ${prompt}
+PROCESSO DE PENSAMENTO OBRIGATÓRIO:
+1. Analise o pedido e gere a solução funcional.
+2. REVISÃO CRÍTICA: Posso diminuir seletores? Posso usar Vanilla JS? O CSS está duplicado?
+3. OTIMIZAÇÃO: Remova comentários, espaços excessivos, consolide funções.
+REGRAS DE SAÍDA:
+- Consolide TUDO (antigo + novo) em um único bloco.
+- CSS em <style>, JS em <script>.
+- Não use bibliotecas externas a menos que seja estritamente necessário.
+- Retorne APENAS o código. Sem explicações, sem crases de markdown.`;
+
+      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + state.apiKey, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: promptFinal }] }] })
+      });
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error.message);
+
+      let code = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      code = code.replace(/```html|```javascript|```css|```/g, '').trim();
+
+      state.appliedScripts = code;
+      updateCodePanel();
+      renderSandbox();
+      toast('⚡ Código gerado e otimizado!', 'success');
+    } catch (e) {
+      toast('Erro na IA: ' + e.message, 'error');
+    } finally {
+      btn.innerHTML = '<span>✨</span> Aplicar & Otimizar';
+      btn.classList.remove('btn-loading');
+      hideOverlay();
+    }
+  });
+
+  // ─── COPY ────────────────────────────────────────────────
+  $('copyBtn').addEventListener('click', () => {
+    if (!state.appliedScripts) { toast('Nada para copiar.', 'error'); return; }
+    navigator.clipboard.writeText(state.appliedScripts);
+    toast('📋 Copiado para a área de transferência!', 'success');
+  });
+
+  // ─── TABS ────────────────────────────────────────────────
+  $('tabPreview').addEventListener('click', () => {
+    state.tab = 'preview';
+    $('tabPreview').classList.add('active');
+    $('tabSource').classList.remove('active');
+    if (state.htmlSource) {
+      sandboxFrame.style.display = 'block';
+      sourceView.style.display = 'none';
+    }
+  });
+
+  $('tabSource').addEventListener('click', () => {
+    state.tab = 'source';
+    $('tabSource').classList.add('active');
+    $('tabPreview').classList.remove('active');
+    sandboxFrame.style.display = 'none';
+    if (state.htmlSource) {
+      sourceView.textContent = state.htmlSource;
+      sourceView.style.display = 'block';
+      sandboxEmpty.style.display = 'none';
+    }
+  });
+
+  // ─── RENDER SANDBOX ──────────────────────────────────────
+  function renderSandbox() {
+    if (!state.htmlSource) return;
+
+    const template = `<!DOCTYPE html><html><head>
+<base href="${state.url}/">
+<meta charset="UTF-8">
+<style>body{margin:0;padding:0}</style>
+</head><body>
+${state.htmlSource}
+${state.appliedScripts}
+</body></html>`;
+
+    const blob = new Blob([template], { type: 'text/html' });
+    const blobUrl = URL.createObjectURL(blob);
+
+    sandboxEmpty.style.display = 'none';
+    sandboxFrame.src = blobUrl;
+    sandboxFrame.style.display = 'block';
+    sourceView.style.display = 'none';
+  }
+
+  // ─── CODE PANEL ──────────────────────────────────────────
+  function updateCodePanel() {
+    if (state.appliedScripts) {
+      codeOutput.innerHTML = `<pre>${escapeHtml(state.appliedScripts)}</pre>`;
+    } else {
+      codeOutput.innerHTML = '<div class="empty-code">Nenhum script gerado ainda.</div>';
+    }
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ─── CHIPS ───────────────────────────────────────────────
+  function fillChip(el) {
+    const map = {
+      'Mudar cor CTA': 'Mude a cor de todos os botões de call-to-action para azul royal (#1D4ED8) com hover em azul claro e transição suave.',
+      'Adicionar banner': 'Adicione um banner fixo no topo da página com a mensagem "🔥 Oferta especial este mês!" em fundo azul e botão branco "Ver Oferta".',
+      'Pop-up de oferta': 'Crie um pop-up que aparece após 3 segundos com uma oferta especial de test drive, fundo escuro semi-transparente e botão de fechar.',
+      'Chat flutuante': 'Adicione um botão de chat flutuante no canto inferior direito que, ao clicar, abre um mini-painel de contato.',
+      'Countdown timer': 'Insira um contador regressivo de 24 horas no topo da página com estilo urgente, mostrando horas, minutos e segundos.',
+      'Formulário lead': 'Adicione um formulário de captura de lead flutuante no canto lateral direito pedindo nome, telefone e interesse no veículo.',
+    };
+    promptInput.value = map[el.textContent] || el.textContent;
+    promptInput.focus();
+  }
+
+  // ─── OVERLAY ─────────────────────────────────────────────
+  function showOverlay(title, sub) {
+    $('overlayTitle').textContent = title;
+    $('overlaySub').textContent = sub;
+    $('loadingOverlay').classList.add('show');
+  }
+  function hideOverlay() {
+    $('loadingOverlay').classList.remove('show');
+  }
+
+  // ─── TOAST ───────────────────────────────────────────────
+  function toast(msg, type = 'info') {
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+    el.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
+    $('toastContainer').appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
+
+  // Keyboard shortcut: Ctrl+Enter to apply
+  promptInput.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      $('applyBtn').click();
+    }
+  });
+</script>
+</body>
+</html>
