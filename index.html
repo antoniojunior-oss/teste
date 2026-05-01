@@ -109,13 +109,14 @@
       box-shadow: 0 0 16px var(--accent-glow);
     }
 
-    .sandbox-label {
-      font-family: 'DM Sans', sans-serif;
-      font-weight: 600;
-      font-size: 14px;
-      letter-spacing: 0.02em;
-      color: rgba(255,255,255,0.85);
+    .logo-text {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 17px;
+      letter-spacing: -0.3px;
+      color: var(--white);
     }
+    .logo-text span { color: var(--accent); }
 
     .topnav-badge {
       font-size: 10px;
@@ -252,18 +253,14 @@
       color: var(--white);
     }
 
-    .btn-reset {
-      background: #dc2626;
-      color: var(--white);
-      border: none;
-      box-shadow: 0 2px 12px rgba(220,38,38,0.35);
+    .btn-danger {
+      background: rgba(239,68,68,0.1);
+      color: #fca5a5;
+      border: 1px solid rgba(239,68,68,0.2);
     }
-    .btn-reset:hover {
-      background: #b91c1c;
-      box-shadow: 0 4px 20px rgba(220,38,38,0.5);
-      transform: translateY(-1px);
+    .btn-danger:hover {
+      background: rgba(239,68,68,0.18);
     }
-    .btn-reset:active { transform: translateY(0); }
 
     /* ── SIDEBAR (Control Panel) ── */
     .sidebar {
@@ -285,12 +282,12 @@
     }
 
     .section-label {
-      font-family: 'DM Sans', sans-serif;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 0.01em;
-      text-transform: none;
-      color: var(--blue-300);
+      font-family: 'Syne', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--blue-400);
       margin-bottom: 14px;
       display: flex;
       align-items: center;
@@ -700,9 +697,8 @@
   <!-- TOP NAV -->
   <nav class="topnav">
     <div class="topnav-logo">
-      <img src="https://arquivista.imd.ufrn.br/fileservice/file/a8196adc-604c-4b12-88a1-312c072099c0?key=5d6245325627b9702553b961a52922f7606604743d4e846340c9aaeee3b1ffa0&v=1775289015333&v=1775289015357" alt="Autoforce" style="height:30px;width:auto;object-fit:contain;" />
-      <div style="width:1px;height:22px;background:rgba(255,255,255,0.2);margin:0 8px;"></div>
-      <span class="sandbox-label">Sandbox</span>
+      <div class="logo-icon">🚗</div>
+      <span class="logo-text">IA<span>Dealer</span> Pro</span>
     </div>
     <div class="topnav-right" style="gap:12px">
       <div id="statusDot" class="status-dot"></div>
@@ -721,13 +717,13 @@
           placeholder="https://www.concessionaria.com.br" />
       </div>
       <button class="btn btn-primary" id="cloneBtn">
-        Clonar Site
+        <span>🔍</span> Clonar Site
       </button>
       <button class="btn btn-ghost" id="refreshBtn">
-        Refresh
+        <span>🔄</span> Refresh
       </button>
-      <button class="btn btn-reset" id="resetBtn">
-        Resetar
+      <button class="btn btn-danger" id="resetBtn">
+        <span>🗑️</span> Resetar
       </button>
     </div>
 
@@ -736,7 +732,7 @@
 
       <!-- API KEY -->
       <div class="sidebar-section">
-        <div class="section-label">Configuração</div>
+        <div class="section-label">⚙️ Configuração</div>
         <div class="field-label">Gemini API Key</div>
         <div class="api-input-wrap">
           <input class="api-input" id="apiKey" type="password"
@@ -750,7 +746,7 @@
 
       <!-- AI ASSISTANT -->
       <div class="sidebar-section" style="flex:1">
-        <div class="section-label">Assistente IA</div>
+        <div class="section-label">🤖 Assistente IA</div>
         <div class="field-label">O que você quer alterar?</div>
         <textarea class="prompt-area" id="promptInput"
           placeholder="Ex: Mude a cor do botão de envio para azul e adicione uma animação de hover com sombra..."
