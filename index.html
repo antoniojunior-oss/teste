@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>IA Dealer Pro — Sandbox</title>
-  <!-- Importando a SDK do Google Generative AI -->
+  
+  <!-- SDK do Google Generative AI -->
   <script type="importmap">
     {
       "imports": {
@@ -12,169 +13,227 @@
       }
     }
   </script>
+
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
   
-  <!-- O CSS permanece o mesmo que você já tem, omiti aqui para focar na lógica -->
   <style>
-    /* Mantenha seus estilos originais aqui */
-    :root { --blue-900: #0a1628; --blue-500: #1d4ed8; --accent: #38bdf8; --white: #ffffff; }
-    body { font-family: 'DM Sans', sans-serif; background: var(--blue-900); color: var(--white); margin: 0; }
-    /* ... (restante do seu CSS) ... */
+    :root {
+      --blue-900: #0a1628; --blue-800: #0d2042; --blue-600: #1a3f82;
+      --blue-500: #1d4ed8; --blue-400: #3b82f6; --accent: #38bdf8;
+      --white: #ffffff; --gray-400: #94a3b8; --gray-500: #64748b;
+      --success: #22c55e; --error: #ef4444; --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--blue-900); color: var(--white); overflow: hidden; height: 100vh; }
+
+    /* Layout Grid */
+    .app-wrapper { display: grid; grid-template-columns: 320px 1fr; grid-template-rows: 60px 70px 1fr; height: 100vh; }
+
+    /* Topnav */
+    .topnav { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; background: rgba(10,22,40,0.8); border-bottom: 1px solid rgba(59,130,246,0.15); backdrop-filter: blur(10px); }
+    .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; }
+    .logo span { color: var(--accent); }
+    .status-badge { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gray-500); }
+    .dot.active { background: var(--success); box-shadow: 0 0 8px var(--success); }
+
+    /* URL Bar */
+    .url-bar { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 0 24px; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.05); }
+    input, textarea { background: rgba(255,255,255,0.05); border: 1px solid rgba(59,130,246,0.2); color: white; border-radius: 8px; padding: 10px; outline: none; width: 100%; }
+    input:focus, textarea:focus { border-color: var(--accent); }
+
+    .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; transition: 0.2s; white-space: nowrap; }
+    .btn-primary { background: var(--blue-500); color: white; }
+    .btn-primary:hover { background: var(--blue-400); }
+
+    /* Sidebar */
+    .sidebar { padding: 20px; border-right: 1px solid rgba(59,130,246,0.1); display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+    .section-title { font-size: 11px; text-transform: uppercase; color: var(--accent); letter-spacing: 1px; margin-bottom: 10px; }
+
+    /* Sandbox Area */
+    .sandbox { background: #f1f5f9; position: relative; overflow: hidden; }
+    iframe { width: 100%; height: 100%; border: none; background: white; }
+    .empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--gray-500); text-align: center; }
+
+    /* Overlay */
+    .overlay { position: fixed; inset: 0; background: rgba(10,22,40,0.8); display: none; align-items: center; justify-content: center; z-index: 1000; flex-direction: column; gap: 15px; }
+    .overlay.show { display: flex; }
+    .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #codeOutput { font-family: monospace; font-size: 11px; background: #050e1e; padding: 10px; border-radius: 8px; max-height: 200px; overflow-y: auto; color: #7dd3fc; margin-top: 10px; }
   </style>
 </head>
 <body>
 
 <div class="app-wrapper">
-  <!-- Mantenha sua estrutura de HTML original (Nav, Sidebar, Sandbox) -->
-  <!-- ... (Mesmo HTML que você enviou antes) ... -->
+  <nav class="topnav">
+    <div class="logo">IA<span>Dealer</span> Pro</div>
+    <div class="status-badge">
+      <div id="statusDot" class="dot"></div>
+      <span id="statusText">Aguardando API Key</span>
+    </div>
+  </nav>
+
+  <div class="url-bar">
+    <input type="text" id="urlInput" placeholder="URL da Concessionária (ex: https://concessionaria.com.br)" />
+    <button class="btn btn-primary" id="cloneBtn">Clonar Site</button>
+  </div>
+
+  <aside class="sidebar">
+    <div>
+      <p class="section-title">⚙️ Configuração</p>
+      <input type="password" id="apiKey" placeholder="Sua Gemini API Key" />
+    </div>
+
+    <div style="flex: 1">
+      <p class="section-title">🤖 Assistente IA</p>
+      <textarea id="promptInput" placeholder="O que deseja alterar? (Ex: mude a cor do botão para azul)"></textarea>
+      <button class="btn btn-primary" id="applyBtn" style="width: 100%; margin-top: 10px;">Aplicar Mudanças</button>
+      
+      <div id="codeOutput" style="display:none"></div>
+    </div>
+  </aside>
+
+  <section class="sandbox">
+    <div id="emptyState" class="empty-state">
+      <p>Nenhum site carregado. Cole uma URL acima.</p>
+    </div>
+    <iframe id="sandboxFrame" style="display:none"></iframe>
+  </section>
+</div>
+
+<div class="overlay" id="loader">
+  <div class="spinner"></div>
+  <p id="loaderMsg">Processando...</p>
 </div>
 
 <script type="module">
   import { GoogleGenerativeAI } from "@google/generative-ai";
 
-  // --- ESTADO DO APP ---
   const state = {
-    url: '',
+    apiKey: localStorage.getItem('ia_dealer_key') || '',
     htmlSource: '',
-    appliedScripts: '',
-    apiKey: localStorage.getItem('gemini_api_key') || '',
-    isProcessing: false
+    url: '',
+    scripts: ''
   };
 
-  // --- ELEMENTOS ---
   const $ = id => document.getElementById(id);
-  const urlInput = $('urlInput');
-  const apiKeyInput = $('apiKey');
-  const promptInput = $('promptInput');
-  const sandboxFrame = $('sandboxFrame');
-  const codeOutput = $('codeOutput');
-  const statusDot = $('statusDot');
 
-  // --- INICIALIZAÇÃO ---
+  // Inicialização
   if (state.apiKey) {
-    apiKeyInput.value = state.apiKey;
-    updateApiStatus();
+    $('apiKey').value = state.apiKey;
+    updateStatus(true);
   }
 
-  // --- LÓGICA DA API KEY ---
-  apiKeyInput.addEventListener('input', (e) => {
+  // Monitorar API Key
+  $('apiKey').addEventListener('input', (e) => {
     state.apiKey = e.target.value.trim();
-    localStorage.setItem('gemini_api_key', state.apiKey);
-    updateApiStatus();
+    localStorage.setItem('ia_dealer_key', state.apiKey);
+    updateStatus(state.apiKey.length > 20);
   });
 
-  function updateApiStatus() {
-    if (state.apiKey.length > 20) {
-      statusDot.classList.add('active');
-      $('apiStatus').innerHTML = '<span style="color:#22c55e">● Chave pronta</span>';
-    } else {
-      statusDot.classList.remove('active');
-      $('apiStatus').innerHTML = '<span>● Aguardando chave...</span>';
-    }
+  function updateStatus(ok) {
+    $('statusDot').className = ok ? 'dot active' : 'dot';
+    $('statusText').innerText = ok ? 'API Pronta' : 'Aguardando API Key';
   }
 
-  // --- CLONAGEM (Via Proxy) ---
-  // Nota: O JS no navegador não pode clonar sites diretamente (CORS). 
-  // Usaremos um serviço de proxy gratuito para demonstração.
+  // Clonar Site (Usando Proxy AllOrigins para evitar CORS)
   $('cloneBtn').addEventListener('click', async () => {
-    const url = urlInput.value.trim();
-    if (!url) return alert("Insira uma URL");
-
-    showOverlay("Capturando site...", "Aguarde enquanto buscamos o HTML...");
+    const url = $('urlInput').value.trim();
+    if (!url) return alert("Insira uma URL válida.");
+    
+    showLoader("Clonando...", "Buscando estrutura do site...");
     
     try {
-      // Usando o AllOrigins como proxy para burlar o CORS
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-      const response = await fetch(proxyUrl);
+      const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
       const data = await response.json();
       
-      state.htmlSource = cleanHTML(data.contents);
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(data.contents, 'text/html');
+      
+      // Limpeza básica de scripts de rastreio que travam o sandbox
+      doc.querySelectorAll('script[src*="gtm"], script[src*="analytics"]').forEach(s => s.remove());
+      
+      state.htmlSource = doc.documentElement.innerHTML;
       state.url = url;
       
-      renderSandbox();
-      hideOverlay();
-      toast("Site clonado com sucesso!", "success");
+      render();
     } catch (err) {
-      hideOverlay();
-      alert("Erro ao clonar: " + err.message);
+      alert("Erro ao clonar: Verifique a URL ou tente novamente.");
+    } finally {
+      hideLoader();
     }
   });
 
-  function cleanHTML(html) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    // Remove scripts pesados/trackers
-    const remove = doc.querySelectorAll('script, iframe, ins');
-    remove.forEach(el => el.remove());
-    return doc.body.innerHTML;
-  }
-
-  // --- LÓGICA DA IA (Gemini JS SDK) ---
+  // Chamar Gemini IA
   $('applyBtn').addEventListener('click', async () => {
-    if (!state.apiKey) return alert("Insira a API Key");
-    if (!state.htmlSource) return alert("Clone um site primeiro");
+    if (!state.apiKey) return alert("Por favor, insira sua API Key.");
+    if (!state.htmlSource) return alert("Clone um site primeiro.");
 
-    const promptUser = promptInput.value.trim();
-    showOverlay("IA Pensando...", "Gerando código otimizado...");
+    const prompt = $('promptInput').value.trim();
+    if (!prompt) return alert("Diga o que a IA deve fazer.");
+
+    showLoader("IA Pensando...", "Gerando novos estilos e scripts...");
 
     try {
       const genAI = new GoogleGenerativeAI(state.apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-      const promptSystem = `
+      const systemPrompt = `
         Atue como Desenvolvedor Front-end Sênior. 
-        CONTEXTO HTML: ${state.htmlSource.substring(0, 5000)}
-        PEDIDO: ${promptUser}
-        REGRAS: Retorne APENAS o código (CSS em <style> e JS em <script>). Sem explicações.
+        CONTEXTO HTML: ${state.htmlSource.substring(0, 8000)}
+        PEDIDO: ${prompt}
+        REGRAS: 
+        1. Retorne APENAS o código puro.
+        2. Combine CSS em <style> e JS em <script>.
+        3. Sem explicações ou markdown.
       `;
 
-      const result = await model.generateContent(promptSystem);
-      const response = await result.response;
-      let code = response.text().replace(/```html|```javascript|```css|```/g, "").trim();
+      const result = await model.generateContent(systemPrompt);
+      const code = result.response.text().replace(/```html|```javascript|```css|```/g, "").trim();
       
-      state.appliedScripts = code;
-      renderSandbox();
-      updateCodePanel();
-      hideOverlay();
-      toast("Alterações aplicadas!", "success");
+      state.scripts = code;
+      render();
+      
+      $('codeOutput').style.display = "block";
+      $('codeOutput').innerText = code;
+      
     } catch (err) {
-      hideOverlay();
       alert("Erro na IA: " + err.message);
+    } finally {
+      hideLoader();
     }
   });
 
-  // --- RENDERIZAÇÃO ---
-  function renderSandbox() {
-    const template = `
+  function render() {
+    const frame = $('sandboxFrame');
+    const blob = new Blob([`
       <html>
         <head>
           <base href="${state.url}/">
-          <style>body{margin:0}</style>
+          <meta charset="UTF-8">
+          <style>body { margin: 0; padding: 0; }</style>
         </head>
         <body>
           ${state.htmlSource}
-          ${state.appliedScripts}
+          ${state.scripts}
         </body>
       </html>
-    `;
-    const blob = new Blob([template], { type: 'text/html' });
-    sandboxFrame.src = URL.createObjectURL(blob);
-    sandboxFrame.style.display = "block";
-    $('sandboxEmpty').style.display = "none";
+    `], { type: 'text/html' });
+
+    frame.src = URL.createObjectURL(blob);
+    frame.style.display = "block";
+    $('emptyState').style.display = "none";
   }
 
-  function updateCodePanel() {
-    codeOutput.innerHTML = `<pre>${state.appliedScripts.replace(/</g, "&lt;")}</pre>`;
+  function showLoader(t, s) { 
+    $('loaderMsg').innerHTML = `<strong>${t}</strong><br><small>${s}</small>`;
+    $('loader').classList.add('show'); 
   }
+  function hideLoader() { $('loader').classList.remove('show'); }
 
-  // --- UI HELPERS ---
-  function showOverlay(t, s) { 
-    $('overlayTitle').innerText = t; 
-    $('overlaySub').innerText = s; 
-    $('loadingOverlay').classList.add('show'); 
-  }
-  function hideOverlay() { $('loadingOverlay').classList.remove('show'); }
-  function toast(msg, type) { console.log(msg); } // Simplificado para o exemplo
 </script>
 </body>
 </html>
