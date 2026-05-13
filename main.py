@@ -103,8 +103,7 @@ with col_ia:
                         
                         # Limpeza segura de blocos de código
                         if "```" in texto_ia:
-                            partes_texto = texto_ia.split("
-```")
+                            partes_texto = texto_ia.split("```")
                             # Pega o conteúdo de dentro do bloco se houver
                             codigo_limpo = partes_texto[1] if len(partes_texto) > 1 else texto_ia
                             # Remove possíveis tags de linguagem como 'html' ou 'css' na primeira linha
