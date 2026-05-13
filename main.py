@@ -4,193 +4,132 @@ from bs4 import BeautifulSoup
 import google.generativeai as genai
 
 # 1. Configuração da Página
-st.set_page_config(page_title="IA Dealer Pro - Sandbox", layout="wide", page_icon="🚗")
+st.set_page_config(page_title="IA Dealer Pro - Full Modular", layout="wide", page_icon="🚗")
 
 # 2. Funções de Suporte
 def carregar_modelo_seguro(key):
     try:
-        if not key:
-            return None
+        if not key: return None
         genai.configure(api_key=key)
-        
-        # Tenta listar os modelos para validar a conexão
         modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
         for opcao in ['models/gemini-1.5-flash', 'models/gemini-1.5-pro']:
-            if opcao in modelos:
-                return genai.GenerativeModel(opcao)
-        
-        if modelos:
-            return genai.GenerativeModel(modelos[0])
-            
-        return None
+            if opcao in modelos: return genai.GenerativeModel(opcao)
+        return genai.GenerativeModel(modelos[0]) if modelos else None
     except Exception as e:
         st.sidebar.error(f"Erro na API: {e}")
         return None
 
 def capturar_site(url):
-    """Clona partes específicas do HTML e limpa scripts de rastreamento."""
+    """Clona e segmenta o site em Head, Body e Footer."""
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Limpeza de scripts de terceiros
+        # Limpeza de trackers
         for s in soup(['script', 'iframe']):
             src = s.get('src', '')
-            if any(x in src for x in ['google-analytics', 'facebook', 'hotjar', 'gtm']):
-                s.decompose()
+            if any(x in src for x in ['google-analytics', 'facebook', 'gtm']): s.decompose()
         
-        # Extração modular: Separa Head e Conteúdo do Body
+        # Segmentação Modular
         head_content = "".join([str(item) for item in soup.head.contents]) if soup.head else ""
-        # Pegamos o conteúdo do body sem a própria tag <body> para facilitar inserção no CMS
-        body_content = "".join([str(item) for item in soup.body.contents]) if soup.body else str(soup)
+        
+        # Busca o footer especificamente, se não achar, o body conterá tudo
+        footer_tag = soup.find('footer')
+        footer_content = str(footer_tag) if footer_tag else ""
+        
+        # O Body aqui é o que sobra (removendo o footer se ele foi extraído)
+        if footer_tag:
+            footer_tag.decompose()
+        body_content = "".join([str(item) for item in soup.body.contents]) if soup.body else ""
         
         return {
             "head": head_content,
-            "body": body_content
+            "body": body_content,
+            "footer": footer_content
         }
     except Exception as e:
         st.error(f"Erro ao capturar site: {e}")
         return None
 
-# 3. Inicialização do Estado da Sessão
+# 3. Estado da Sessão
 if "site_partes" not in st.session_state:
-    st.session_state.site_partes = {"head": "", "body": ""}
+    st.session_state.site_partes = {"head": "", "body": "", "footer": ""}
 if "scripts_aplicados" not in st.session_state:
     st.session_state.scripts_aplicados = ""
 if "url_atual" not in st.session_state:
     st.session_state.url_atual = ""
-if "refresh_count" not in st.session_state:
-    st.session_state.refresh_count = 0
 
-# 4. Barra Lateral
-st.sidebar.title("⚙️ Painel de Controle")
-api_key = st.sidebar.text_input("Gemini API Key", type="password", help="Obtenha em aistudio.google.com")
+# 4. Interface e Lógica
+st.sidebar.title("⚙️ Configurações")
+api_key = st.sidebar.text_input("Gemini API Key", type="password")
 model = carregar_modelo_seguro(api_key) if api_key else None
 
-if model:
-    st.sidebar.success(f"Modelo Ativo: {model.model_name}")
-else:
-    st.sidebar.warning("Aguardando API Key válida...")
+st.title("🚗 IA Dealer: Editor Full Modular")
+url_input = st.text_input("URL da Concessionária:", value=st.session_state.url_atual)
 
-# 5. Interface Principal
-st.title("🚗 IA Dealer: Editor & Sandbox")
-
-url_input = st.text_input("URL da Concessionária:", value=st.session_state.url_atual, placeholder="https://www.site.com.br")
-
-if st.button("🔍 Clonar Novo Site"):
+if st.button("🔍 Clonar Estrutura Completa"):
     if url_input:
-        with st.spinner("Capturando estrutura modular..."):
+        with st.spinner("Mapeando Head, Body e Footer..."):
             partes = capturar_site(url_input)
             if partes:
                 st.session_state.url_atual = url_input
                 st.session_state.site_partes = partes
                 st.session_state.scripts_aplicados = "" 
-                st.success("Site capturado e segmentado!")
                 st.rerun()
 
 st.divider()
-
-# 6. Layout de Colunas
 col_sandbox, col_ia = st.columns([1.2, 0.8])
 
 with col_ia:
-    st.subheader("🤖 Assistente de Edição")
+    st.subheader("🤖 Analista de Performance")
     if st.session_state.site_partes["body"]:
-        prompt_usuario = st.text_area("O que você quer mudar?", 
-                                     placeholder="Ex: Mude a cor do botão principal para azul e adicione um script de redirecionamento...",
-                                     height=150)
+        prompt_usuario = st.text_area("Descreva a melhoria:", height=100)
         
-        if st.button("✨ Gerar Script de Melhoria", use_container_width=True):
+        if st.button("✨ Gerar Código Otimizado", use_container_width=True):
             if model:
-                with st.spinner("IA processando mudanças modulares..."):
-                    # Enviamos o contexto do Body para a IA
-                    contexto_html = st.session_state.site_partes["body"][:5000]
-                    script_atual = st.session_state.scripts_aplicados
-                    
+                with st.spinner("Analisando necessidade de CSS vs JS...[cite: 1]"):
+                    contexto = st.session_state.site_partes["body"][:5000]
                     prompt_final = f"""
-                    Atue como Desenvolvedor Front-end Sênior.
-                    OBJETIVO: Criar códigos de personalização (CSS/JS) para um site.
-
-                    ESTRUTURA ATUAL (Body): {contexto_html}
+                    Atue como Arquiteto Front-end. 
+                    Analise: Use CSS (<style>) para visual e JS (<script>) apenas para lógica.[cite: 1]
+                    Retorne apenas as tags de código, sem markdown.
                     
-                    CÓDIGO JÁ APLICADO: {script_atual if script_atual else "Nenhum."}
-                    
-                    NOVO PEDIDO: {prompt_usuario}
-                    
-                    REGRAS CRÍTICAS:
-                    1. Gere APENAS as tags <style> e <script> necessárias.
-                    2. NÃO inclua tags estruturais (html, head, body).
-                    3. Consolide mudanças novas com as antigas.
-                    4. Retorne APENAS o código puro. Sem explicações, sem markdown (```).
+                    HTML BASE: {contexto}
+                    PEDIDO: {prompt_usuario}
                     """
-                    
                     try:
-                        resposta = model.generate_content(prompt_final)
-                        codigo_ia = resposta.text.strip().replace("```html", "").replace("```javascript", "").replace("```css", "").replace("```", "")
-                        
-                        st.session_state.scripts_aplicados = codigo_ia
-                        st.toast("Scripts gerados!", icon="🚀")
+                        res = model.generate_content(prompt_final)
+                        st.session_state.scripts_aplicados = res.text.strip().replace("```html", "").replace("
+```", "")
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro na IA: {e}")
-            else:
-                st.error("Insira a API Key na barra lateral!")
+                    except Exception as e: st.error(f"Erro IA: {e}")
 
-        if st.button("🗑️ Resetar Tudo", use_container_width=True):
-            st.session_state.scripts_aplicados = ""
-            st.session_state.site_partes = {"head": "", "body": ""}
-            st.session_state.url_atual = ""
-            st.rerun()
-
-        st.divider()
-        with st.expander("📄 Código para Implementação (CMS)", expanded=True):
-            if st.session_state.scripts_aplicados:
-                st.info("Copie o código abaixo para o campo 'Custom Scripts/Head' do seu site real.")
-                st.code(st.session_state.scripts_aplicados, language="html")
-            else:
-                st.info("Aguardando geração de scripts.")
+        # Exibição dos códigos para o usuário copiar para o site real
+        with st.expander("📄 Códigos para Implementação Real", expanded=True):
+            st.info("Copie cada parte para seu respectivo campo no CMS.")
+            t1, t2, t3 = st.tabs(["Custom Scripts (IA)", "Body Base", "Footer Base"])
+            with t1: st.code(st.session_state.scripts_aplicados, language="html")
+            with t2: st.code(st.session_state.site_partes["body"], language="html")
+            with t3: st.code(st.session_state.site_partes["footer"], language="html")
 
 with col_sandbox:
-    header_col, refresh_col = st.columns([0.7, 0.3])
-    header_col.subheader("🧪 Sandbox")
-    
-    if refresh_col.button("🔄 Refresh", use_container_width=True):
-        if st.session_state.url_atual:
-            with st.spinner("Recarregando..."):
-                novas_partes = capturar_site(st.session_state.url_atual)
-                if novas_partes:
-                    st.session_state.site_partes = novas_partes
-                    st.session_state.refresh_count += 1
-                    st.rerun()
-
+    st.subheader("🧪 Sandbox")
     if st.session_state.site_partes["body"]:
-        try:
-            # Template monta o Head original + o Body original + os novos scripts da IA
-            template_sandbox = """
-<!DOCTYPE html>
-<html>
-    <head>
-        <base href="[URL_BASE]/">
-        <meta charset="UTF-8">
-        [CONTEUDO_HEAD]
-        <style> body { margin: 0; padding: 0; } </style>
-    </head>
-    <body>
-        [CONTEUDO_BODY]
-        [SCRIPTS_IA]
-    </body>
-</html>
-"""
-            html_final = template_sandbox.replace("[URL_BASE]", str(st.session_state.url_atual))
-            html_final = html_final.replace("[CONTEUDO_HEAD]", st.session_state.site_partes["head"])
-            html_final = html_final.replace("[CONTEUDO_BODY]", st.session_state.site_partes["body"])
-            html_final = html_final.replace("[SCRIPTS_IA]", st.session_state.scripts_aplicados)
-
-            st.components.v1.html(html_final, height=800, scrolling=True)
-        except Exception as e:
-            st.error(f"Erro na renderização: {e}")
-    else:
-        st.info("Insira uma URL para começar.")
+        # Reconstrução total para o Iframe[cite: 2]
+        html_render = f"""
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <base href="{st.session_state.url_atual}/">
+                {st.session_state.site_partes["head"]}
+            </head>
+            <body>
+                {st.session_state.site_partes["body"]}
+                {st.session_state.site_partes["footer"]}
+                {st.session_state.scripts_aplicados}
+            </body>
+        </html>
+        """
+        st.components.v1.html(html_render, height=800, scrolling=True)
