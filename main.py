@@ -25,32 +25,39 @@ def carregar_modelo_seguro(key):
             
         return None
     except Exception as e:
-        # Exibe o erro real para sabermos o que está acontecendo
         st.sidebar.error(f"Erro na API: {e}")
         return None
 
 def capturar_site(url):
-    """Clona o HTML da URL e limpa scripts de rastreamento."""
+    """Clona partes específicas do HTML e limpa scripts de rastreamento."""
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Limpeza de scripts que podem travar o sandbox ou monitorar cliques reais
+        # Limpeza de scripts de terceiros
         for s in soup(['script', 'iframe']):
             src = s.get('src', '')
             if any(x in src for x in ['google-analytics', 'facebook', 'hotjar', 'gtm']):
                 s.decompose()
         
-        return soup.prettify()
+        # Extração modular: Separa Head e Conteúdo do Body
+        head_content = "".join([str(item) for item in soup.head.contents]) if soup.head else ""
+        # Pegamos o conteúdo do body sem a própria tag <body> para facilitar inserção no CMS
+        body_content = "".join([str(item) for item in soup.body.contents]) if soup.body else str(soup)
+        
+        return {
+            "head": head_content,
+            "body": body_content
+        }
     except Exception as e:
         st.error(f"Erro ao capturar site: {e}")
         return None
 
 # 3. Inicialização do Estado da Sessão
-if "codigo_fonte" not in st.session_state:
-    st.session_state.codigo_fonte = ""
+if "site_partes" not in st.session_state:
+    st.session_state.site_partes = {"head": "", "body": ""}
 if "scripts_aplicados" not in st.session_state:
     st.session_state.scripts_aplicados = ""
 if "url_atual" not in st.session_state:
@@ -75,13 +82,13 @@ url_input = st.text_input("URL da Concessionária:", value=st.session_state.url_
 
 if st.button("🔍 Clonar Novo Site"):
     if url_input:
-        with st.spinner("Capturando estrutura..."):
-            html_clonado = capturar_site(url_input)
-            if html_clonado:
+        with st.spinner("Capturando estrutura modular..."):
+            partes = capturar_site(url_input)
+            if partes:
                 st.session_state.url_atual = url_input
-                st.session_state.codigo_fonte = html_clonado
+                st.session_state.site_partes = partes
                 st.session_state.scripts_aplicados = "" 
-                st.success("Site clonado!")
+                st.success("Site capturado e segmentado!")
                 st.rerun()
 
 st.divider()
@@ -91,96 +98,96 @@ col_sandbox, col_ia = st.columns([1.2, 0.8])
 
 with col_ia:
     st.subheader("🤖 Assistente de Edição")
-    if st.session_state.codigo_fonte:
+    if st.session_state.site_partes["body"]:
         prompt_usuario = st.text_area("O que você quer mudar?", 
-                                     placeholder="Ex: Se o cliente escolher a opção X, redirecione para o link Y...",
+                                     placeholder="Ex: Mude a cor do botão principal para azul e adicione um script de redirecionamento...",
                                      height=150)
         
-        if st.button("✨ Aplicar/Otimizar Mudanças", use_container_width=True):
+        if st.button("✨ Gerar Script de Melhoria", use_container_width=True):
             if model:
-                with st.spinner("IA processando e otimizando código..."):
-                    # Enviamos um resumo do HTML para a IA entender o contexto
-                    contexto_html = st.session_state.codigo_fonte[:6000]
+                with st.spinner("IA processando mudanças modulares..."):
+                    # Enviamos o contexto do Body para a IA
+                    contexto_html = st.session_state.site_partes["body"][:5000]
                     script_atual = st.session_state.scripts_aplicados
                     
                     prompt_final = f"""
                     Atue como Desenvolvedor Front-end Sênior.
-                    OBJETIVO: Modificar o comportamento/visual de um site de concessionária.
+                    OBJETIVO: Criar códigos de personalização (CSS/JS) para um site.
+
+                    ESTRUTURA ATUAL (Body): {contexto_html}
                     
-                    HTML BASE (trecho): {contexto_html}
+                    CÓDIGO JÁ APLICADO: {script_atual if script_atual else "Nenhum."}
                     
-                    CÓDIGO JÁ EXISTENTE (Otimize-o se necessário): 
-                    {script_atual if script_atual else "Nenhum código aplicado ainda."}
+                    NOVO PEDIDO: {prompt_usuario}
                     
-                    NOVO PEDIDO DO USUÁRIO: {prompt_usuario}
-                    
-                    REGRAS:
-                    1. Consolide o novo pedido com o código antigo em um bloco único e limpo.
-                    2. Use <style> para CSS e <script> para JavaScript.
-                    3. Retorne APENAS o código puro. Sem explicações, sem markdown (```).
+                    REGRAS CRÍTICAS:
+                    1. Gere APENAS as tags <style> e <script> necessárias.
+                    2. NÃO inclua tags estruturais (html, head, body).
+                    3. Consolide mudanças novas com as antigas.
+                    4. Retorne APENAS o código puro. Sem explicações, sem markdown (```).
                     """
                     
                     try:
                         resposta = model.generate_content(prompt_final)
                         codigo_ia = resposta.text.strip().replace("```html", "").replace("```javascript", "").replace("```css", "").replace("```", "")
                         
-                        # Sobrescreve com a versão otimizada
                         st.session_state.scripts_aplicados = codigo_ia
-                        st.toast("Alterações aplicadas com sucesso!", icon="🚀")
+                        st.toast("Scripts gerados!", icon="🚀")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Erro na IA: {e}")
             else:
-                st.error("ERRO: Você precisa inserir a API Key na barra lateral!")
+                st.error("Insira a API Key na barra lateral!")
 
         if st.button("🗑️ Resetar Tudo", use_container_width=True):
             st.session_state.scripts_aplicados = ""
-            st.session_state.codigo_fonte = ""
+            st.session_state.site_partes = {"head": "", "body": ""}
             st.session_state.url_atual = ""
             st.rerun()
 
         st.divider()
-        with st.expander("📄 Scripts Inseridos (Copiar Código)", expanded=True):
+        with st.expander("📄 Código para Implementação (CMS)", expanded=True):
             if st.session_state.scripts_aplicados:
+                st.info("Copie o código abaixo para o campo 'Custom Scripts/Head' do seu site real.")
                 st.code(st.session_state.scripts_aplicados, language="html")
             else:
-                st.info("Nenhum script gerado ainda.")
+                st.info("Aguardando geração de scripts.")
 
 with col_sandbox:
     header_col, refresh_col = st.columns([0.7, 0.3])
     header_col.subheader("🧪 Sandbox")
     
-    # Refresh funcional: Recarrega o HTML original mantendo o JS da IA
     if refresh_col.button("🔄 Refresh", use_container_width=True):
         if st.session_state.url_atual:
-            with st.spinner("Recarregando fonte..."):
-                novo_html = capturar_site(st.session_state.url_atual)
-                if novo_html:
-                    st.session_state.codigo_fonte = novo_html
+            with st.spinner("Recarregando..."):
+                novas_partes = capturar_site(st.session_state.url_atual)
+                if novas_partes:
+                    st.session_state.site_partes = novas_partes
                     st.session_state.refresh_count += 1
                     st.rerun()
 
-    if st.session_state.codigo_fonte:
+    if st.session_state.site_partes["body"]:
         try:
-            # Template seguro usando replace para evitar erro de chaves {}
+            # Template monta o Head original + o Body original + os novos scripts da IA
             template_sandbox = """
 <!DOCTYPE html>
 <html>
     <head>
         <base href="[URL_BASE]/">
         <meta charset="UTF-8">
+        [CONTEUDO_HEAD]
         <style> body { margin: 0; padding: 0; } </style>
-        </head>
+    </head>
     <body>
-        [CONTEUDO_HTML]
+        [CONTEUDO_BODY]
         [SCRIPTS_IA]
     </body>
 </html>
 """
             html_final = template_sandbox.replace("[URL_BASE]", str(st.session_state.url_atual))
-            html_final = html_final.replace("[CONTEUDO_HTML]", str(st.session_state.codigo_fonte))
-            html_final = html_final.replace("[SCRIPTS_IA]", str(st.session_state.scripts_aplicados))
-            html_final = html_final.replace("[REF_ID]", str(st.session_state.refresh_count))
+            html_final = html_final.replace("[CONTEUDO_HEAD]", st.session_state.site_partes["head"])
+            html_final = html_final.replace("[CONTEUDO_BODY]", st.session_state.site_partes["body"])
+            html_final = html_final.replace("[SCRIPTS_IA]", st.session_state.scripts_aplicados)
 
             st.components.v1.html(html_final, height=800, scrolling=True)
         except Exception as e:
